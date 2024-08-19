@@ -1,6 +1,7 @@
 //
 // Created by Konstantin Gredeskoul on 5/16/17.
 //
+#include "task.h"
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -11,10 +12,10 @@ using namespace std;
 class CoroutinesCppMtTest : public ::testing::Test {
 
 protected:
-  VI numerators   = {5, 9, 17, 933345453464353416L};
-  VI denominators = {2, 3, 19, 978737423423423499L};
-  VI divisions    = {2, 3, 0, 0};
-  VI remainders   = {1, 0, 17, 933345453464353416};
+  //VI numerators   = {5, 9, 17, 933345453464353416L};
+  //VI denominators = {2, 3, 19, 978737423423423499L};
+  //VI divisions    = {2, 3, 0, 0};
+  //VI remainders   = {1, 0, 17, 933345453464353416};
 
   virtual void SetUp() {
   };
@@ -31,8 +32,16 @@ protected:
   }
 };
 
-TEST_F(CoroutinesCppMtTest, 5_DivideBy_2) {
-  verify(0);
+TEST_F(CoroutinesCppMtTest, Wait_Task_On_Main_Thread) {
+	nd::CppWorker::markMainThread();
+    auto helloTask = []()->nd::Task{
+		cout << "hello in thread id:0x" << std::hex << this_thread::get_id() << endl;
+        co_return;
+	}();
+    helloTask.runOnProcessor<nd::PreDefProcessGroup::Main>(0);
+
+    cout << "main  in thread id:0x" << std::hex << this_thread::get_id() << endl;
+    helloTask.wait();
 }
 
 TEST_F(CoroutinesCppMtTest, 9_DivideBy_3) {
