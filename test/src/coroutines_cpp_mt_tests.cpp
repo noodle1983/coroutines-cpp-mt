@@ -4,6 +4,8 @@
 #include "task.h"
 #include "gtest/gtest.h"
 
+#include "processor_types.h"
+
 using namespace std;
 
 
@@ -33,15 +35,16 @@ protected:
 };
 
 TEST_F(CoroutinesCppMtTest, Wait_Task_On_Main_Thread) {
-	nd::CppWorker::markMainThread();
+	nd::Worker::markMainThread();
     auto helloTask = []()->nd::Task{
 		cout << "hello in thread id:0x" << std::hex << this_thread::get_id() << endl;
         co_return;
 	}();
-    helloTask.runOnProcessor<nd::PreDefProcessGroup::Main>(0);
+    helloTask.runOnProcessor(-1, 0);
 
-    cout << "main  in thread id:0x" << std::hex << this_thread::get_id() << endl;
+    cout << "main1 in thread id:0x" << std::hex << this_thread::get_id() << endl;
     helloTask.wait();
+    cout << "main2 in thread id:0x" << std::hex << this_thread::get_id() << endl;
 }
 
 TEST_F(CoroutinesCppMtTest, 9_DivideBy_3) {

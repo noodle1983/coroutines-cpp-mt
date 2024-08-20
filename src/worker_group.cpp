@@ -1,12 +1,5 @@
-/**
- * Licensing Information
- *    This is a release of rzsz-nd, brought to you by Dong Lu(noodle1983@126
- *    .com). Except for extra permissions from Dong Lu(noodle1983@126.com),
- *    this software is released under version 3 of the GNU General
- *    Public License (GPLv3).
- **/
-#include "cpp_processor.h"
-#include "cpp_worker.h"
+#include "worker_group.h"
+#include "worker.h"
 
 #include <functional>
 #include <chrono>
@@ -16,17 +9,17 @@ using namespace nd;
 
 //-----------------------------------------------------------------------------
 
-CppProcessor::CppProcessor(const unsigned theThreadCount)
+WorkerGroup::WorkerGroup(const unsigned theThreadCount)
     : threadCountM(theThreadCount)
     , workersM(NULL)
-    , nameM("default")
+    , nameM("group")
     , waitStopM(false)
 {
 }
 
 //-----------------------------------------------------------------------------
 
-CppProcessor::CppProcessor(const std::string& theName, const unsigned theThreadCount)
+WorkerGroup::WorkerGroup(const std::string& theName, const unsigned theThreadCount)
     : threadCountM(theThreadCount)
     , workersM(NULL)
     , nameM(theName)
@@ -36,7 +29,7 @@ CppProcessor::CppProcessor(const std::string& theName, const unsigned theThreadC
 
 //-----------------------------------------------------------------------------
 
-CppProcessor::~CppProcessor()
+WorkerGroup::~WorkerGroup()
 {
     if (workersM) {
         if (waitStopM){
@@ -50,7 +43,7 @@ CppProcessor::~CppProcessor()
 
 //-----------------------------------------------------------------------------
 
-void CppProcessor::start(bool toWaitStop)
+void WorkerGroup::start(bool toWaitStop)
 {
     waitStopM = toWaitStop;
     if (0 == threadCountM)
@@ -59,18 +52,18 @@ void CppProcessor::start(bool toWaitStop)
     if (NULL != workersM)
         return;
 
-    workersM = new CppWorker[threadCountM];
+    workersM = new Worker[threadCountM];
     threadsM.reserve(threadCountM);
     for (unsigned i = 0; i < threadCountM; i++)
     {
-        //workersM[i].setGroupInfo(threadCountM, i);
-        threadsM.push_back(thread(&CppWorker::run, &workersM[i]));
+        workersM[i].init(groupIdM, threadCountM, i);
+        threadsM.push_back(thread(&Worker::thread_main, &workersM[i]));
     }
 }
 
 //-----------------------------------------------------------------------------
 
-void CppProcessor::waitStop()
+void WorkerGroup::waitStop()
 {
     lock_guard<mutex> lock(stopMutexM);
     if (NULL == workersM)
@@ -104,7 +97,7 @@ void CppProcessor::waitStop()
 
 //-----------------------------------------------------------------------------
 
-void CppProcessor::stop()
+void WorkerGroup::stop()
 {
     lock_guard<mutex> lock(stopMutexM);
     if (NULL == workersM)
@@ -124,16 +117,16 @@ void CppProcessor::stop()
 
 //-----------------------------------------------------------------------------
 
-template<>
-void CppProcessor::process<(ProcessorGroup)PreDefProcessGroup::CurrentWorker>(SessionId theId, Job* job){
-    CppWorker::getCurrentWorker()->process(job);
-}
-
-//-----------------------------------------------------------------------------
-
-template<>
-void CppProcessor::process<(ProcessorGroup)PreDefProcessGroup::Main>(SessionId theId, Job* job){
-    CppWorker::getMainWorker()->process(job);
-}
+//template<>
+//void WorkerGroup::process<(WorkerGroup)PreDefProcessGroup::CurrentWorker>(SessionId theId, Job* job){
+//    Worker::getCurrentWorker()->process(job);
+//}
+//
+////-----------------------------------------------------------------------------
+//
+//template<>
+//void WorkerGroup::process<(WorkerGroup)PreDefProcessGroup::Main>(SessionId theId, Job* job){
+//    Worker::getMainWorker()->process(job);
+//}
 
 //-----------------------------------------------------------------------------

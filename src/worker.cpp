@@ -1,4 +1,4 @@
-#include "cpp_worker.h"
+#include "worker.h"
 #include "log.h"
 #include "min_heap.h"
 
@@ -7,27 +7,33 @@
 using namespace nd;
 using namespace std;
 
-thread_local CppWorker* CppWorker::currentWorkerM = nullptr; 
-thread_local std::thread::id CppWorker::currentThreadId; 
+thread_local Worker* Worker::currentWorkerM = nullptr; 
+thread_local std::thread::id Worker::currentThreadId; 
+thread_local int Worker::currentWorkerGroupId = PreDefProcessGroup::Invalid;
+thread_local int Worker::currentWorkerId = 0;
+thread_local char Worker::workerName[32] = "";
 
 //-----------------------------------------------------------------------------
-CppWorker::CppWorker()
-    : isToStopM(false)
+Worker::Worker()
+    : workerGroupIdM(PreDefProcessGroup::Invalid)
+    , workerIdM(0)
+    , isToStopM(false)
     , isWaitStopM(false)
+    , isStopedM(false)
 {
     min_heap_ctor(&timerHeapM);	
 }
 
 //-----------------------------------------------------------------------------
 
-CppWorker::~CppWorker()
+Worker::~Worker()
 {
     min_heap_dtor(&timerHeapM);	
 }
 
 //-----------------------------------------------------------------------------
 
-void CppWorker::stop()
+void Worker::stop()
 {
     isToStopM = true;
     queueCondM.notify_one();
@@ -35,7 +41,7 @@ void CppWorker::stop()
 
 //-----------------------------------------------------------------------------
 
-void CppWorker::waitStop()
+void Worker::waitStop()
 {
     isWaitStopM = true;
     queueCondM.notify_one();
@@ -44,9 +50,9 @@ void CppWorker::waitStop()
 //-----------------------------------------------------------------------------
 
 
-void CppWorker::process(Job* theJob)
+void Worker::process(Job* theJob)
 {
-    if (isToStopM || isWaitStopM){
+    if (isToStopM || isStopedM){
         delete theJob;
         return;
     }
@@ -65,7 +71,7 @@ void CppWorker::process(Job* theJob)
 
 //-----------------------------------------------------------------------------
 
-min_heap_item_t* CppWorker::addLocalTimer(
+min_heap_item_t* Worker::addLocalTimer(
         uint64_t theMsTime, 
 		TimerCallback theCallback,
 		void* theArg)
@@ -99,7 +105,7 @@ min_heap_item_t* CppWorker::addLocalTimer(
 
 //-----------------------------------------------------------------------------
 
-void CppWorker::cancelLocalTimer(min_heap_item_t*& theEvent)
+void Worker::cancelLocalTimer(min_heap_item_t*& theEvent)
 {
     if (theEvent == NULL) {return;}
     min_heap_erase(&timerHeapM, theEvent);
@@ -109,7 +115,7 @@ void CppWorker::cancelLocalTimer(min_heap_item_t*& theEvent)
 
 //-----------------------------------------------------------------------------
 
-void CppWorker::handleLocalTimer()
+void Worker::handleLocalTimer()
 {
     if (!min_heap_empty(&timerHeapM))
     {
@@ -134,20 +140,23 @@ void CppWorker::handleLocalTimer()
 
 //-----------------------------------------------------------------------------
 
-void CppWorker::run()
+void Worker::thread_main()
 {
     currentWorkerM = this;
     currentThreadId = std::this_thread::get_id();
+    currentWorkerGroupId = workerGroupIdM;
+    currentWorkerId = workerIdM;
 
-    while (!isToStopM)
+    while (!isToStopM &&!(isWaitStopM && isJobQueueEmpty()))
     {
         internalStep();
     }
+    isStopedM = true;
 }
 
 //-----------------------------------------------------------------------------
 
-void CppWorker::internalStep()
+void Worker::internalStep()
 {
     Job* job = NULL;
     {
@@ -188,7 +197,7 @@ void CppWorker::internalStep()
 
 //-----------------------------------------------------------------------------
 
-void CppWorker::step()
+void Worker::step()
 {
     assert(std::this_thread::get_id() == currentThreadId);
     internalStep();

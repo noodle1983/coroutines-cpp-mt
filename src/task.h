@@ -2,7 +2,8 @@
 #include <coroutine>
 #include <iostream>
 
-#include <Processor.h>
+#include "processor_types.h"
+#include "worker_manager.h"
 
 namespace nd
 {
@@ -27,20 +28,9 @@ namespace nd
         void unhandled_exception() noexcept { }
 
     private:
-        template<ProcessorGroup theProcessGroup = (ProcessorGroup)PreDefProcessGroup::CurrentWorker>
-        void runOnProcessor(const SessionId theId){
-            if (processorGroupM != (ProcessorGroup)PreDefProcessGroup::Invalid){
-                // already started
-                return;
-            }
-            processorGroupM = theProcessGroup;
-            sessionIdM = theId;
-            Processor::process<theProcessGroup>(theId, new nd::Job{[this](){
-                std::coroutine_handle<TaskPromise>::from_promise(*this).resume();
-            }});
+        void runOnProcessor(int workerGroupId, const SessionId theId){
         }
 
-        std::atomic<ProcessorGroup> processorGroupM = (ProcessorGroup)PreDefProcessGroup::Invalid;
         SessionId sessionIdM = 0;
     };
 
@@ -52,17 +42,15 @@ namespace nd
             : coroutineM(theCoroutine)
         {}
         virtual ~Task(){
-            if (coroutineM){
-                coroutineM.destroy();
-                coroutineM = nullptr;
-            }
         }
 
-        template<ProcessorGroup theProcessGroup = (ProcessorGroup)PreDefProcessGroup::CurrentWorker>
-        Task& runOnProcessor(const SessionId theId = 0)
+        Task& runOnProcessor(int workerGroupId, const SessionId theId = 0)
         {
             if (coroutineM){
-                coroutineM.promise().runOnProcessor<theProcessGroup>(theId);
+				g_worker_mgr->runOnWorkerGroup(workerGroupId, theId, new nd::Job{[this](){
+					coroutineM.resume();
+                    //notify
+				}});
             }
             return *this;
         }
@@ -71,7 +59,7 @@ namespace nd
         void wait()
         {
             while (coroutineM && !coroutineM.done()){
-                CppWorker::getCurrentWorker()->step();
+                Worker::getCurrentWorker()->step();
             }
         }
 

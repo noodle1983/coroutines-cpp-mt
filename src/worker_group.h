@@ -1,15 +1,8 @@
-/**
- * Licensing Information
- *    This is a release of rzsz-nd, brought to you by Dong Lu(noodle1983@126
- *    .com). Except for extra permissions from Dong Lu(noodle1983@126.com),
- *    this software is released under version 3 of the GNU General
- *    Public License (GPLv3).
- **/
-#ifndef CPPPROCESSOR_H
-#define CPPPROCESSOR_H
+#ifndef WORKER_GROUP_H
+#define WORKER_GROUP_H
 
 #include "processor_types.h"
-#include "cpp_worker.h"
+#include "worker.h"
 #include "singleton.hpp"
 
 #include <string>
@@ -19,19 +12,19 @@
 namespace nd
 {
 	class ProcessorSensor;
-    class CppWorker;
+    class Worker;
 
-    class CppProcessor
+    class WorkerGroup
     {
     public:
 		friend class nd::ProcessorSensor;
 
-        template<ProcessorGroup theGroup>
-        static void process(SessionId theId, Job* job);
+        //template<WorkerGroup theGroup>
+        //static void process(SessionId theId, Job* job);
 
-        CppProcessor(const unsigned theThreadCount);
-        CppProcessor(const std::string& theName, const unsigned theThreadCount);
-        ~CppProcessor();
+        WorkerGroup(const unsigned theThreadCount);
+        WorkerGroup(const std::string& theName, const unsigned theThreadCount);
+        ~WorkerGroup();
 
         void start(bool toWaitStop = false);
         // must not call stop in its worker
@@ -67,26 +60,27 @@ namespace nd
         }
 
     private:
+        unsigned groupIdM;
         unsigned threadCountM;
-        CppWorker* workersM;
+        Worker* workersM;
         std::vector<std::thread> threadsM;
         std::string nameM;
         bool waitStopM; 
         std::mutex stopMutexM;
     };
 
-    template<ProcessorGroup theGroup>
-    void process(SessionId theId, Job* job){
-        auto processor = Singleton<CppProcessor, theGroup>::instance();
-        processor->process(theId, job);
-    }
+    //template<WorkerGroup theGroup>
+    //void process(SessionId theId, Job* job){
+    //    auto processor = Singleton<WorkerGroup, theGroup>::instance();
+    //    processor->process(theId, job);
+    //}
 
-    template<>
-    void process<(ProcessorGroup)PreDefProcessGroup::CurrentWorker>(SessionId theId, Job* job);
+    //template<>
+    //void process<(WorkerGroup)PreDefProcessGroup::CurrentWorker>(SessionId theId, Job* job);
 
-    template<>
-    void process<(ProcessorGroup)PreDefProcessGroup::Main>(SessionId theId, Job* job);
+    //template<>
+    //void process<(WorkerGroup)PreDefProcessGroup::Main>(SessionId theId, Job* job);
 }
 
-#endif /* CPPPROCESSOR_H */
+#endif /* WORKER_GROUP_H */
 

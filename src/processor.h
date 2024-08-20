@@ -1,19 +1,11 @@
-/**
- * Licensing Information
- *    This is a release of rzsz-nd, brought to you by Dong Lu(noodle1983@126
- *    .com). Except for extra permissions from Dong Lu(noodle1983@126.com),
- *    this software is released under version 3 of the GNU General
- *    Public License (GPLv3).
- **/
 #ifndef PROCESSOR_H
 #define PROCESSOR_H
 
 #include "Singleton.hpp"
-#include "cpp_processor.h"
-#include "cpp_worker.h"
+#include "worker_group.h"
+#include "worker.h"
 
 namespace nd{
-    using Processor = CppProcessor;
 
 };
 

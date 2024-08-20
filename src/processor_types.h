@@ -6,7 +6,6 @@
 #include <functional>
 
 namespace nd{
-    using ProcessorGroup = int32_t;
     using ProcessWorkerId = int32_t;
     using SessionId = uint64_t;
     typedef std::function<void ()> Job;
@@ -15,7 +14,7 @@ namespace nd{
     namespace PreDefProcessGroup{
         enum{
             Main = -1,
-            CurrentWorker = -2,
+            Current = -2,
             Invalid = -3,
         };
     };
