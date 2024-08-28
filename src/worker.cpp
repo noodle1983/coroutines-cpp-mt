@@ -50,7 +50,7 @@ void Worker::waitStop()
 //-----------------------------------------------------------------------------
 
 
-void Worker::process(Job* theJob)
+void Worker::addJob(Job* theJob)
 {
     if (isToStopM || isStopedM){
         delete theJob;

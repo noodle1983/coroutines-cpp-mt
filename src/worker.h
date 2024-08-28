@@ -64,7 +64,7 @@ namespace nd
         void stop();
         void waitStop();
 
-        void process(Job* theJob);
+        void addJob(Job* theJob);
 		min_heap_item_t* addLocalTimer(
 				uint64_t theMsTime, 
 				TimerCallback theCallback,

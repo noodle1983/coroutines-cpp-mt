@@ -31,32 +31,32 @@ namespace nd
         void waitStop();
         void stop();
 
+        inline Worker* getWorker(const size_t sessionId){
+            if (NULL == workersM) {return NULL;}
+            unsigned workerId = sessionId % threadCountM;
+            return &workersM[workerId];
+        }
+
 		min_heap_item_t* addLocalTimer(
                 const SessionId theId, 
 				const unsigned long long theMsTime, 
 				TimerCallback theCallback,
 				void* theArg)
         {
-            if (NULL == workersM) {return NULL;}
-            unsigned workerId = theId % threadCountM;
-            return workersM[workerId].addLocalTimer(theMsTime, theCallback, theArg);
+            return getWorker(theId)->addLocalTimer(theMsTime, theCallback, theArg);
         }
 		inline void cancelLocalTimer(
                 const SessionId theId, 
                 min_heap_item_t*& theEvent)
         {
-            if (NULL == workersM) {return;}
-            unsigned workerId = theId % threadCountM;
-            return workersM[workerId].cancelLocalTimer(theEvent);
+            return getWorker(theId)->cancelLocalTimer(theEvent);
         }
 
-        void process(
+        void addJob(
                 const SessionId theId, 
                 Job* theJob)
         {
-            if (NULL == workersM) {delete theJob; return;}
-            unsigned workerId = theId % threadCountM;
-            workersM[workerId].process(theJob);
+            getWorker(theId)->addJob(theJob);
         }
 
     private:

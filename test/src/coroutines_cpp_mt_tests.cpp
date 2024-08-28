@@ -40,10 +40,10 @@ TEST_F(CoroutinesCppMtTest, Wait_Task_On_Main_Thread) {
 		cout << "hello in thread id:0x" << std::hex << this_thread::get_id() << endl;
         co_return;
 	}();
-    helloTask.runOnProcessor(-1, 0);
 
+    helloTask.runOnProcessor();
     cout << "main1 in thread id:0x" << std::hex << this_thread::get_id() << endl;
-    helloTask.wait();
+    helloTask.waitInMain();
     cout << "main2 in thread id:0x" << std::hex << this_thread::get_id() << endl;
 }
 
