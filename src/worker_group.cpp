@@ -9,18 +9,9 @@ using namespace nd;
 
 //-----------------------------------------------------------------------------
 
-WorkerGroup::WorkerGroup(const unsigned theThreadCount)
-    : threadCountM(theThreadCount)
-    , workersM(NULL)
-    , nameM("group")
-    , waitStopM(false)
-{
-}
-
-//-----------------------------------------------------------------------------
-
-WorkerGroup::WorkerGroup(const std::string& theName, const unsigned theThreadCount)
-    : threadCountM(theThreadCount)
+WorkerGroup::WorkerGroup(unsigned theGroupId, const unsigned theThreadCount, const std::string& theName)
+    : groupIdM(theGroupId)
+    , threadCountM(theThreadCount)
     , workersM(NULL)
     , nameM(theName)
     , waitStopM(false)
@@ -56,7 +47,7 @@ void WorkerGroup::start(bool toWaitStop)
     threadsM.reserve(threadCountM);
     for (unsigned i = 0; i < threadCountM; i++)
     {
-        workersM[i].init(groupIdM, threadCountM, i);
+        workersM[i].init(groupIdM, threadCountM, i, nameM);
         threadsM.push_back(thread(&Worker::thread_main, &workersM[i]));
     }
 }
@@ -118,14 +109,14 @@ void WorkerGroup::stop()
 //-----------------------------------------------------------------------------
 
 //template<>
-//void WorkerGroup::process<(WorkerGroup)PreDefProcessGroup::CurrentWorker>(SessionId theId, Job* job){
+//void WorkerGroup::process<(WorkerGroup)PreDefWorkerGroup::CurrentWorker>(SessionId theId, Job* job){
 //    Worker::getCurrentWorker()->process(job);
 //}
 //
 ////-----------------------------------------------------------------------------
 //
 //template<>
-//void WorkerGroup::process<(WorkerGroup)PreDefProcessGroup::Main>(SessionId theId, Job* job){
+//void WorkerGroup::process<(WorkerGroup)PreDefWorkerGroup::Main>(SessionId theId, Job* job){
 //    Worker::getMainWorker()->process(job);
 //}
 

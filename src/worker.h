@@ -22,12 +22,14 @@ namespace nd
         Worker();
         ~Worker();
 
-        void init(int theWorkerGroupId, int theWorkerId, int theThreadNum) {
+        void init(int theWorkerGroupId, int theWorkerId, int theThreadNum, std::string& theGroupName) {
             // init once only
-            assert(currentWorkerGroupId == PreDefProcessGroup::Invalid);
+            assert(workerGroupIdM == PreDefWorkerGroup::Invalid);
 
             workerGroupIdM = theWorkerGroupId;
             workerIdM = theWorkerId;
+            workerNumM = theThreadNum;
+            workerGroupNameM = theGroupName;
         }
 
         inline bool isJobQueueEmpty()
@@ -43,12 +45,13 @@ namespace nd
 
         static inline void markMainThread(){
             // init once only
-            assert(currentWorkerGroupId == PreDefProcessGroup::Invalid);
+            assert(currentWorkerGroupId == PreDefWorkerGroup::Invalid);
 
             currentThreadId = std::this_thread::get_id();
-            currentWorkerGroupId = PreDefProcessGroup::Main;
+            currentWorkerGroupId = PreDefWorkerGroup::Main;
             currentWorkerId = 0;
             currentWorkerM = getMainWorker();
+            snprintf(workerName, sizeof(workerName)-1, "[Main]");
         }
         static inline Worker* getMainWorker(){
             assert(std::this_thread::get_id() == currentThreadId);
@@ -60,9 +63,14 @@ namespace nd
             assert(currentWorkerM != nullptr);
             return currentWorkerM;
         }
+        static inline const char* getCurrWorkerName() {
+            assert(currentWorkerM != nullptr);
+            return workerName;
+        }
 
         void stop();
         void waitStop();
+        void waitUntilEmpty();
 
         void addJob(Job* theJob);
 		min_heap_item_t* addLocalTimer(
@@ -87,6 +95,8 @@ namespace nd
 
         int workerGroupIdM;
         int workerIdM;
+        int workerNumM;
+        std::string workerGroupNameM;
 
         JobQueue jobQueueM;
         std::mutex queueMutexM;

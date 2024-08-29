@@ -9,14 +9,15 @@ using namespace std;
 
 thread_local Worker* Worker::currentWorkerM = nullptr; 
 thread_local std::thread::id Worker::currentThreadId; 
-thread_local int Worker::currentWorkerGroupId = PreDefProcessGroup::Invalid;
+thread_local int Worker::currentWorkerGroupId = PreDefWorkerGroup::Invalid;
 thread_local int Worker::currentWorkerId = 0;
 thread_local char Worker::workerName[32] = "";
 
 //-----------------------------------------------------------------------------
 Worker::Worker()
-    : workerGroupIdM(PreDefProcessGroup::Invalid)
+    : workerGroupIdM(PreDefWorkerGroup::Invalid)
     , workerIdM(0)
+    , workerNumM(0)
     , isToStopM(false)
     , isWaitStopM(false)
     , isStopedM(false)
@@ -45,6 +46,16 @@ void Worker::waitStop()
 {
     isWaitStopM = true;
     queueCondM.notify_one();
+}
+
+//-----------------------------------------------------------------------------
+
+void Worker::waitUntilEmpty()
+{
+    while (!isJobQueueEmpty())
+    {
+        internalStep();
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -146,6 +157,7 @@ void Worker::thread_main()
     currentThreadId = std::this_thread::get_id();
     currentWorkerGroupId = workerGroupIdM;
     currentWorkerId = workerIdM;
+	snprintf(workerName, sizeof(workerName)-1, "[%s %d/%d]", workerGroupNameM.c_str(), workerIdM, workerNumM);
 
     while (!isToStopM &&!(isWaitStopM && isJobQueueEmpty()))
     {

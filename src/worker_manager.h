@@ -29,11 +29,11 @@ namespace nd{
 			memset(m_worker_groups, 0, sizeof(WorkerGroup*) * m_max_worker_group);
 		}
 
-		void start(unsigned worker_group_id, signed processor_num) {
+		void start(unsigned worker_group_id, signed processor_num, const std::string& theName = "xxx") {
 			assert(worker_group_id < m_max_worker_group);
 			assert(m_worker_groups[worker_group_id] == nullptr);
 
-			m_worker_groups[worker_group_id] = new WorkerGroup(processor_num);
+			m_worker_groups[worker_group_id] = new WorkerGroup(worker_group_id, processor_num, theName);
 			m_worker_groups[worker_group_id]->start();
 		}
 
@@ -64,10 +64,10 @@ namespace nd{
 		}
 
 		Worker* getWorker(unsigned worker_group_id, size_t session_id) {
-			if (worker_group_id == PreDefProcessGroup::Main) {
+			if (worker_group_id == PreDefWorkerGroup::Main) {
 				return Worker::getMainWorker();
 			}
-			if (worker_group_id == PreDefProcessGroup::Current) {
+			if (worker_group_id == PreDefWorkerGroup::Current) {
 				return Worker::getCurrentWorker();
 			}
 
@@ -78,10 +78,10 @@ namespace nd{
 		}
 
 		void runOnWorkerGroup(int worker_group_id, size_t session_id, Job* job) {
-			if (worker_group_id == PreDefProcessGroup::Main) {
+			if (worker_group_id == PreDefWorkerGroup::Main) {
 				return runOnMainThread(job);
 			}
-			if (worker_group_id == PreDefProcessGroup::Current) {
+			if (worker_group_id == PreDefWorkerGroup::Current) {
 				return runOnCurrentThread(job);
 			}
 
@@ -107,7 +107,7 @@ namespace nd{
 	};
 };
 
-#define g_worker_mgr (nd::Singleton<WorkerManager, 0>::instance())
+#define g_worker_mgr (nd::Singleton<nd::WorkerManager, 0>::instance())
 
 
 #endif /* WORKER_MANAGER_H */

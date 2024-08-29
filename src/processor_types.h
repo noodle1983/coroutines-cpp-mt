@@ -11,7 +11,7 @@ namespace nd{
     typedef std::function<void ()> Job;
     typedef std::list<Job*> JobQueue;
 
-    namespace PreDefProcessGroup{
+    namespace PreDefWorkerGroup{
         enum{
             Main = -1,
             Current = -2,

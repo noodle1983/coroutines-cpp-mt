@@ -4,6 +4,7 @@
 
 #include "processor_types.h"
 #include "worker_manager.h"
+#include "log.h"
 
 namespace nd
 {
@@ -45,7 +46,7 @@ namespace nd
         virtual ~Task(){
         }
 
-        Task& runOnProcessor(int workerGroupId = PreDefProcessGroup::Current, const SessionId theId = 0)
+        Task& runOnProcessor(int workerGroupId = PreDefWorkerGroup::Current, const SessionId theId = 0)
         {
             if (coroutineM){
                 runningWorkerM = g_worker_mgr->getWorker(workerGroupId, theId);
@@ -60,10 +61,12 @@ namespace nd
             }
 
 			runningWorkerM->addJob(new nd::Job{[this](){
+				LOG_TRACE("Task resumed");
 				coroutineM.resume();
 
 				//notify
 				startWorkerM->addJob(new nd::Job{ [this]() {
+                    LOG_TRACE((coroutineM.done() ? "Task completed" : "Task suspended"));
 					if (parentCoroutineM) {
 						parentCoroutineM.resume();
 						return;

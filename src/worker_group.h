@@ -22,8 +22,7 @@ namespace nd
         //template<WorkerGroup theGroup>
         //static void process(SessionId theId, Job* job);
 
-        WorkerGroup(const unsigned theThreadCount);
-        WorkerGroup(const std::string& theName, const unsigned theThreadCount);
+        WorkerGroup(const unsigned theGroupId, const unsigned theThreadCount, const std::string& theName = "xxx");
         ~WorkerGroup();
 
         void start(bool toWaitStop = false);
@@ -76,10 +75,10 @@ namespace nd
     //}
 
     //template<>
-    //void process<(WorkerGroup)PreDefProcessGroup::CurrentWorker>(SessionId theId, Job* job);
+    //void process<(WorkerGroup)PreDefWorkerGroup::CurrentWorker>(SessionId theId, Job* job);
 
     //template<>
-    //void process<(WorkerGroup)PreDefProcessGroup::Main>(SessionId theId, Job* job);
+    //void process<(WorkerGroup)PreDefWorkerGroup::Main>(SessionId theId, Job* job);
 }
 
 #endif /* WORKER_GROUP_H */

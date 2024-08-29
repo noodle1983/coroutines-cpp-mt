@@ -6,19 +6,63 @@
 #include <iostream>
 #include <fstream>
 #include <thread>
+#include <algorithm>
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
 
-const char* g_log_filename = "log.h";
-const int g_log_level = 1;
-
 #if WIN32
 #define localtime_r(a, b) localtime_s((b), (a))
+#endif
+
+#ifndef __FILE_NAME__
+	// https://stackoverflow.com/a/54335644
+	template <typename T, size_t S>
+	inline constexpr size_t get_file_name_offset(const T (& str)[S], size_t i = S - 1) {
+		return (str[i] == '/' || str[i] == '\\') ? i + 1 : (i > 0 ? get_file_name_offset(str, i - 1) : 0);
+	}
+
+	template <typename T>
+	inline constexpr size_t get_file_name_offset(T (& str)[1]) { return 0; }
+
+    namespace utility {
+		template <typename T, T v>
+		struct const_expr_value {
+			static constexpr const T value = v;
+		};
+    }
+
+#define UTILITY_CONST_EXPR_VALUE(exp) ::utility::const_expr_value<decltype(exp), exp>::value
+#define __FILE_NAME__ (&__FILE__[UTILITY_CONST_EXPR_VALUE(get_file_name_offset(__FILE__))])
 
 #endif
+
+const char* const g_log_filename = "log.h";
+enum LogLevel{ TRACE = 0, DEBUG, INFO, WARN, ERROR, FATAL };
+const int g_log_level = TRACE;
+const char* const g_loglevel_str[] = {
+    "TRACE ",
+    "DEBUG ",
+    "INFO  ",
+    "WARN  ",
+    "ERR   ",
+    "FATAL "
+};
+template<typename StreamType>
+StreamType& formatLogPrefix(StreamType& os, const char* levelStr, const char* file, const unsigned lineno) {
+	time_t rawTime;
+	struct tm info;
+	char timeStr[80];
+
+	time(&rawTime);
+	localtime_r(&rawTime, &info);
+	strftime(timeStr, 80, "%Y-%m-%d %H:%M:%S ", &info);
+
+	os << timeStr << levelStr << nd::Worker::getCurrWorkerName() << "(" << file << ":" << lineno << ") ";
+    return os;
+}
 
 class FileLogger{
 public:
@@ -27,16 +71,7 @@ public:
     }
 
     std::ofstream& stream(const char* levelStr, const char* file, const unsigned lineno){
-        time_t rawTime;
-        struct tm info;
-        char timeStr[80];
-
-        time(&rawTime);
-        localtime_r(&rawTime, &info);
-        strftime(timeStr, 80, "%Y-%m-%d %H:%M:%S ", &info);
-
-        outM << timeStr << levelStr;// << "(" << file << ":" << lineno << ")";
-        return outM;
+        return formatLogPrefix(outM, levelStr, file, lineno);
     }
 
     std::mutex& mutex(){return mutexM;}
@@ -50,30 +85,30 @@ private:
     std::mutex mutexM;
 };
 
-const char* const g_loglevel_str[] = {
-    "TRACE ",
-    "DEBUG ",
-    "INFO  ",
-    "WARN  ",
-    "ERR   ",
-    "FATAL "
-};
-
 #define g_file_logger (nd::Singleton<FileLogger, 0>::instance())
-#define LOG(level, toErr, msg) {\
+#define FILE_LOG(level, toErr, msg) {\
     if (level >= g_log_level) {\
+        const char* filename = __FILE_NAME__; \
         std::lock_guard<std::mutex> lock(g_file_logger->mutex()); \
-        g_file_logger->stream(g_loglevel_str[level], __FILE__, __LINE__) << msg << std::endl; \
+        g_file_logger->stream(g_loglevel_str[level], filename, __LINE__) << msg << std::endl; \
         if(toErr){std::cerr << msg << std::endl;} \
     }\
 }
 
+#define STD_LOG(level, toErr, msg) {\
+    if (level >= g_log_level) {\
+        const char* filename = __FILE_NAME__; \
+        std::lock_guard<std::mutex> lock(g_file_logger->mutex()); \
+        formatLogPrefix(std::cout, g_loglevel_str[level], filename, __LINE__) << msg << std::endl; \
+    }\
+}
+
 //log relate
-#define LOG_TRACE(msg) LOG(0, false, msg)
-#define LOG_DEBUG(msg) LOG(1, false, msg)
-#define LOG_INFO(msg)  LOG(2, false, msg)
-#define LOG_WARN(msg)  LOG(3, false, msg)
-#define LOG_ERROR(msg) LOG(4, true, msg)
-#define LOG_FATAL(msg) LOG(5, true, msg)
+#define LOG_TRACE(msg) STD_LOG(0, false, msg)
+#define LOG_DEBUG(msg) STD_LOG(1, false, msg)
+#define LOG_INFO (msg) STD_LOG(2, false, msg)
+#define LOG_WARN (msg) STD_LOG(3, false, msg)
+#define LOG_ERROR(msg) STD_LOG(4, true,  msg)
+#define LOG_FATAL(msg) STD_LOG(5, true,  msg)
 
 #endif
