@@ -7,9 +7,11 @@
 
 using namespace std;
 
+// usage 1 : define worker group(thread model)
 namespace WorkerGroup{
 	enum{
-        BG = 0,
+        BG1 = 0,
+        BG2 = 1,
         //...
 
         MAX,
@@ -20,9 +22,12 @@ namespace WorkerGroup{
 class CoroutinesCppMtTest : public ::testing::Test {
 protected:
   static void SetUpTestCase() {
+
+	// usage 2 : start thread
 	nd::Worker::markMainThread();
     g_worker_mgr->init(WorkerGroup::MAX);
-    g_worker_mgr->start(WorkerGroup::BG, 1, "bg");
+    g_worker_mgr->start(WorkerGroup::BG1, 1, "bg1");
+    g_worker_mgr->start(WorkerGroup::BG2, 1, "bg2");
 	LOG_DEBUG("worker inited!");
   };
 
@@ -32,22 +37,25 @@ protected:
   void TearDown() override {}
 };
 
-TEST_F(CoroutinesCppMtTest, Wait_Task_On_Main_Thread) {
-    auto helloTask = []()->nd::Task{
-		LOG_DEBUG("hello in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
-        co_await nd::TimeWaiter(1000);
-		LOG_DEBUG("hello in thread id:0x" << std::hex << this_thread::get_id() << std::dec << " again after 1 sec later");
-        co_return;
+TEST_F(CoroutinesCppMtTest, Wait_Bg_Task_On_Main_Thread) {
+    auto mainTask = []()->nd::Task{
+		LOG_TRACE("-> main task in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
+        auto bgTask = []()->nd::Task {
+            LOG_TRACE("-> bg task in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
+            co_await nd::TimeWaiter(1000);
+            LOG_TRACE("<- bg task in thread id:0x" << std::hex << this_thread::get_id() << std::dec << " after 1 sec later");
+            co_return;
+		}();
+        co_await bgTask.runOnProcessor(WorkerGroup::BG1);
+		LOG_TRACE("<- main task in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
 	}();
 
-    helloTask.runOnProcessor(WorkerGroup::BG);
-    LOG_DEBUG("main1 in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
-    helloTask.waitInMain();
-    LOG_DEBUG("main2 in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
+    mainTask.runOnProcessor(); // run on current worker, which is main worker on the marked main thread.
+    mainTask.waitInMain();
     nd::Worker::getMainWorker()->waitUntilEmpty();
 }
 
-TEST_F(CoroutinesCppMtTest, 9_DivideBy_3) {
+TEST_F(CoroutinesCppMtTest, Wait_Bg_Task_On_Bg_Thread) {
 }
 
 TEST_F(CoroutinesCppMtTest, 17_DivideBy_19) {

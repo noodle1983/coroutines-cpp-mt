@@ -106,7 +106,7 @@ namespace nd
             auto id = m_id.id();
 			m_running_worker->addJob(new nd::Job{[controller, id](){
                 if (!controller) { return; }
-				LOG_TRACE("coroutine task[" << id << "] run in worker");
+				LOG_TRACE("coroutine task-" << id << " run in worker");
 				controller->handle().resume();
 			}});
             return;
@@ -143,20 +143,20 @@ namespace nd
         friend class Task;
 
         TaskPromise() noexcept {
-			LOG_TRACE("task promise created");
+			LOG_TRACE("promise-" << m_id << " created");
 
             m_controller = std::make_shared<CoroutineController>(std::coroutine_handle<TaskPromise>::from_promise(*this));
         }
         virtual ~TaskPromise() {
-			LOG_TRACE("task promise destroyed");
+			LOG_TRACE("promise-" << m_id << " destroyed");
         }
 
         auto initial_suspend() noexcept { 
-			LOG_TRACE("task promise inital_suspend");
+			LOG_TRACE("promise-" << m_id << " inital_suspend");
             return std::suspend_always{}; 
         }
         auto final_suspend() noexcept { 
-			LOG_TRACE("task promise final_suspend");
+			LOG_TRACE("promise-" << m_id << " final_suspend");
             m_controller->onCoroutineDone();
             return std::suspend_never{};
         }
@@ -164,16 +164,16 @@ namespace nd
         Task get_return_object() noexcept;
 
         void return_void() noexcept {
-			LOG_TRACE("task promise return void");
+			LOG_TRACE("promise-" << m_id << " return void");
             m_controller->onCoroutineReturn();
         }
         void unhandled_exception() noexcept { 
-			LOG_TRACE("task promise unhandled exception");
+			LOG_TRACE("promise-" << m_id << " unhandled exception");
         }
 
     private:
         CorotineControllerSharedPtr m_controller;
-        Task* m_task = nullptr;
+        ID<TaskPromise> m_id;
     };
 
     class Task : public BaseTask
@@ -183,10 +183,10 @@ namespace nd
         Task(CorotineControllerSharedPtr& controller)
             : BaseTask(controller)
         {
-			LOG_TRACE("coroutine task[" << m_id << "] created");
+			LOG_TRACE("coroutine task-" << m_id << " created");
         }
         virtual ~Task(){
-			LOG_TRACE("coroutine task[" << m_id << "] destroyed");
+			LOG_TRACE("coroutine task-" << m_id << " destroyed");
         }
 
         Task& runOnProcessor(int workerGroupId = PreDefWorkerGroup::Current, const SessionId theId = 0)

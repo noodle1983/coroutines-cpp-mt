@@ -157,6 +157,7 @@ void Worker::thread_main()
     currentWorkerGroupId = workerGroupIdM;
     currentWorkerId = workerIdM;
 	snprintf(workerName, sizeof(workerName)-1, "[%s %d/%d]", workerGroupNameM.c_str(), workerIdM, workerNumM);
+    LOG_TRACE("worker start");
 
     while (!isToStopM &&!(isWaitStopM && isJobQueueEmpty()))
     {

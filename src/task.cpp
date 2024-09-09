@@ -10,7 +10,7 @@ void CoroutineController::addWaitingTask(BaseTask* task, Worker* worker) {
 		return;
 	}
 	std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
-	if (isDone()) {
+	if (m_coroutine == nullptr) {
 		worker->addJob(new nd::Job{ [task]() {
 			task->onCoroutineReturn();
 		} });
