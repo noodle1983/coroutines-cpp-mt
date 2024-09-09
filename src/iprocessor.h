@@ -25,7 +25,6 @@ namespace nd{
     };
 
     using JobPtr = IJob*;
-    using TimerHandle = min_heap_item_t*;
     using TimerCallback = void (*)(void *arg);
 
     class IProcessor {

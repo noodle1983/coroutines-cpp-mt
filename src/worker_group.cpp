@@ -47,7 +47,7 @@ void WorkerGroup::start(bool toWaitStop)
     threadsM.reserve(threadCountM);
     for (unsigned i = 0; i < threadCountM; i++)
     {
-        workersM[i].init(groupIdM, threadCountM, i, nameM);
+        workersM[i].init(groupIdM, i, threadCountM, nameM);
         threadsM.push_back(thread(&Worker::thread_main, &workersM[i]));
     }
 }

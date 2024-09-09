@@ -1,5 +1,6 @@
 #include "task.h"
 #include "worker_manager.h"
+#include "TimeWaiter.h"
 #include "log.h"
 
 #include "gtest/gtest.h"
@@ -9,6 +10,7 @@ using namespace std;
 namespace WorkerGroup{
 	enum{
         BG = 0,
+        //...
 
         MAX,
 	};
@@ -32,14 +34,16 @@ protected:
 
 TEST_F(CoroutinesCppMtTest, Wait_Task_On_Main_Thread) {
     auto helloTask = []()->nd::Task{
-		LOG_DEBUG("hello in thread id:0x" << std::hex << this_thread::get_id());
+		LOG_DEBUG("hello in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
+        co_await nd::TimeWaiter(1000);
+		LOG_DEBUG("hello in thread id:0x" << std::hex << this_thread::get_id() << std::dec << " again after 1 sec later");
         co_return;
 	}();
 
     helloTask.runOnProcessor(WorkerGroup::BG);
-    LOG_DEBUG("main1 in thread id:0x" << std::hex << this_thread::get_id());
+    LOG_DEBUG("main1 in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
     helloTask.waitInMain();
-    LOG_DEBUG("main2 in thread id:0x" << std::hex << this_thread::get_id());
+    LOG_DEBUG("main2 in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
     nd::Worker::getMainWorker()->waitUntilEmpty();
 }
 

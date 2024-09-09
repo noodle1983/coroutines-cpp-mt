@@ -82,10 +82,9 @@ void Worker::addJob(Job* theJob)
 
 //-----------------------------------------------------------------------------
 
-min_heap_item_t* Worker::addLocalTimer(
+TimerHandle Worker::addLocalTimer(
         uint64_t theMsTime, 
-		TimerCallback theCallback,
-		void* theArg)
+		TimerCallback theCallback)
 {
     if (isToStopM || isWaitStopM){
         return NULL;
@@ -97,9 +96,8 @@ min_heap_item_t* Worker::addLocalTimer(
         min_heap_reserve(&timerHeapM, 128);
     }
 
-	min_heap_item_t* timeoutEvt = new min_heap_item_t();
+	TimerHandle timeoutEvt = new min_heap_item_t();
     timeoutEvt->callback = theCallback;
-    timeoutEvt->arg = theArg;
     timeoutEvt->timeout = std::chrono::steady_clock::now() + std::chrono::milliseconds(theMsTime);
 
     if (-1 == min_heap_push(&timerHeapM, timeoutEvt))
@@ -116,7 +114,7 @@ min_heap_item_t* Worker::addLocalTimer(
 
 //-----------------------------------------------------------------------------
 
-void Worker::cancelLocalTimer(min_heap_item_t*& theEvent)
+void Worker::cancelLocalTimer(TimerHandle& theEvent)
 {
     if (theEvent == NULL) {return;}
     min_heap_erase(&timerHeapM, theEvent);
@@ -133,15 +131,16 @@ void Worker::handleLocalTimer()
         auto timeNow = std::chrono::steady_clock::now();
         while(!min_heap_empty(&timerHeapM)) 
         {
-            min_heap_item_t* topEvent = min_heap_top(&timerHeapM);
+            TimerHandle topEvent = min_heap_top(&timerHeapM);
             if (item_cmp(topEvent->timeout, timeNow, <=))
             {
                 min_heap_pop(&timerHeapM);
-                (topEvent->callback)(topEvent->arg);
+                (topEvent->callback)();
                 delete topEvent;
             }
             else
-            { break;
+            { 
+                break;
             }
         } 
     }

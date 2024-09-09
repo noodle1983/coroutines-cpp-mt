@@ -12,8 +12,6 @@
 #include <singleton.hpp>
 #include <min_heap.h>
 
-typedef void (*TimerCallback)(void *arg);
-
 namespace nd
 {
     class Worker
@@ -51,7 +49,7 @@ namespace nd
             currentWorkerGroupId = PreDefWorkerGroup::Main;
             currentWorkerId = 0;
             currentWorkerM = getMainWorker();
-            snprintf(workerName, sizeof(workerName)-1, "[Main]");
+            snprintf(workerName, sizeof(workerName)-1, "[main]");
         }
         static inline Worker* getMainWorker(){
             assert(std::this_thread::get_id() == currentThreadId);
@@ -73,11 +71,10 @@ namespace nd
         void waitUntilEmpty();
 
         void addJob(Job* theJob);
-		min_heap_item_t* addLocalTimer(
-				uint64_t theMsTime, 
-				TimerCallback theCallback,
-				void* theArg);
-		void cancelLocalTimer(min_heap_item_t*& theEvent);
+        TimerHandle addLocalTimer(
+            uint64_t theMsTime,
+            TimerCallback theCallback);
+		void cancelLocalTimer(TimerHandle& theEvent);
 
         //thread runable function
         void thread_main();

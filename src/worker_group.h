@@ -36,17 +36,16 @@ namespace nd
             return &workersM[workerId];
         }
 
-		min_heap_item_t* addLocalTimer(
+		TimerHandle addLocalTimer(
                 const SessionId theId, 
 				const unsigned long long theMsTime, 
-				TimerCallback theCallback,
-				void* theArg)
+				TimerCallback theCallback)
         {
-            return getWorker(theId)->addLocalTimer(theMsTime, theCallback, theArg);
+            return getWorker(theId)->addLocalTimer(theMsTime, theCallback);
         }
 		inline void cancelLocalTimer(
                 const SessionId theId, 
-                min_heap_item_t*& theEvent)
+                TimerHandle& theEvent)
         {
             return getWorker(theId)->cancelLocalTimer(theEvent);
         }
