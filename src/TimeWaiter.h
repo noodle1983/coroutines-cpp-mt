@@ -9,8 +9,8 @@ namespace nd {
 	// run in the same thread with the coroutine
 	class TimeWaiter {
 	public:
-		TimeWaiter(uint64_t time) 
-			: m_mstime(time) 
+		TimeWaiter(uint64_t millisecond) 
+			: m_mstime(millisecond) 
 			, m_timerHandle(nullptr)
 		{}
 		virtual ~TimeWaiter() {
@@ -18,6 +18,7 @@ namespace nd {
 		}
 
 		TimeWaiter& reset(uint64_t time = 0) {
+			assert(!m_coroutine);
 			if (m_timerHandle) {
 				Worker::getCurrentWorker()->cancelLocalTimer(m_timerHandle);
 			}
@@ -35,7 +36,9 @@ namespace nd {
 			m_timerHandle = Worker::getCurrentWorker()->addLocalTimer(m_mstime, [this]() {
 				m_timerHandle = nullptr;
 				if (m_coroutine) {
-					m_coroutine.resume();
+					auto coroutine = m_coroutine;
+					m_coroutine = nullptr;
+					coroutine.resume();
 				}
 			});
 			return false;
