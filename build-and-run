@@ -31,7 +31,7 @@ export BuildDir="${ProjectRoot}/build/run"
 export BashLibRoot="${ProjectRoot}/bin/lib-bash"
 export LibBashRepo="https://github.com/kigster/lib-bash"
 
-divider.header() {
+coroutines_cpp_mt.header() {
   h1.purple "Fractional Division With Remainder: A CMake Project Template with Tests"
   local OIFC=${IFC}
   IFS="|" read -r -a gcc_info <<< "$(gcc --version 2>&1 | tr '\n' '|')"
@@ -41,7 +41,7 @@ divider.header() {
   h1 "${bldylw}CMAKE:  ${bldblu}$(cmake --version | tr '\n' ' ')"
 }
 
-divider.setup() {
+coroutines_cpp_mt.setup() {
   hl.subtle "Creating Build Folder..."
   run "mkdir -p build/run"
   run "git submodule init && git submodule update"
@@ -49,12 +49,12 @@ divider.setup() {
   [[ -f .idea/workspace.xml ]] || cp .idea/workspace.xml.example .idea/workspace.xml
 }
 
-divider.clean() {
+coroutines_cpp_mt.clean() {
   hl.subtle "Cleaning output folders..."
   run 'rm -rf bin/d* include/d* lib/*'
 }
 
-divider.build() {
+coroutines_cpp_mt.build() {
   run "cd build/run"
   run "cmake ../.. "
   run.set-next show-output-on
@@ -63,18 +63,18 @@ divider.build() {
   run "cd ${ProjectRoot}"
 }
 
-divider.tests() {
-  if [[ -f bin/divider_tests ]]; then
+coroutines_cpp_mt.tests() {
+  if [[ -f bin/coroutines_cpp_mt_tests ]]; then
     run.set-next show-output-on
-    run "echo && bin/divider_tests"
+    run "echo && bin/coroutines_cpp_mt_tests"
   else
-    printf "${bldred}Can't find installed executable ${bldylw}bin/divider_tests.${clr}\n"
+    printf "${bldred}Can't find installed executable ${bldylw}bin/coroutines_cpp_mt_tests.${clr}\n"
     exit 2
   fi
 }
 
-divider.examples() {
-  [[ ! -f bin/divider ]] && {
+coroutines_cpp_mt.examples() {
+  [[ ! -f bin/coroutines_cpp_mt ]] && {
     error "You don't have the cmpiled binary yet".
     exit 3
   }
@@ -82,21 +82,21 @@ divider.examples() {
   run.set-all show-output-on
 
   hr
-  run "bin/divider 11 7"
+  run "bin/coroutines_cpp_mt 11 7"
   hr
-  run "bin/divider 1298798375 94759897"
+  run "bin/coroutines_cpp_mt 1298798375 94759897"
   hr
-  run "bin/divider 78 17"
+  run "bin/coroutines_cpp_mt 78 17"
   hr
 
 }
 
 main() {
-  divider.header
-  divider.setup
-  divider.build
-  divider.tests
-  divider.examples
+  coroutines_cpp_mt.header
+  coroutines_cpp_mt.setup
+  coroutines_cpp_mt.build
+  coroutines_cpp_mt.tests
+  #coroutines_cpp_mt.examples
 }
 
 (( $_s_ )) || main

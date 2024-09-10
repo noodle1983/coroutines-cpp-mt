@@ -6,6 +6,7 @@
 #include "worker.h"
 
 #include <assert.h>
+#include <string.h>
 
 namespace nd{
 	class WorkerManager{
