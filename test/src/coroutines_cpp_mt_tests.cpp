@@ -86,7 +86,6 @@ TEST_F(CoroutinesCppMtTest, Run_Multi_Task_On_Same_Thread) {
 		}();
         bgTask1.runOnProcessor(WorkerGroup::BG1);
 
-		LOG_TRACE("----------------------------------------");
 
         auto bgTask2 = []()->nd::Task {
             LOG_TRACE("-> bg task in worker" << nd::Worker::getCurrWorkerName());
@@ -96,11 +95,10 @@ TEST_F(CoroutinesCppMtTest, Run_Multi_Task_On_Same_Thread) {
 		}();
         bgTask2.runOnProcessor(WorkerGroup::BG1);
 
-		LOG_TRACE("----------------------------------------");
-
         co_await bgTask1;
         co_await bgTask2;
 
+		LOG_TRACE("----------------------------------------");
         // you should see the destruction log of upper promise and task
         // main's resume is called in the BG1 thread, it can be run before the destruction of upper promise and task.
         // so wait for a while to see the log
