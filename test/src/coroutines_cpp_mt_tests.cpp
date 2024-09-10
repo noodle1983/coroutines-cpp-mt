@@ -40,13 +40,31 @@ protected:
 TEST_F(CoroutinesCppMtTest, Wait_Bg_Task_On_Main_Thread) {
     auto mainTask = []()->nd::Task{
 		LOG_TRACE("-> main task in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
-        auto bgTask = []()->nd::Task {
+		LOG_TRACE("----------------------------------------");
+
+        co_await []()->nd::Task {
             LOG_TRACE("-> bg task in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
             co_await nd::TimeWaiter(1000);
             LOG_TRACE("<- bg task in thread id:0x" << std::hex << this_thread::get_id() << std::dec << " after 1 sec later");
             co_return;
-		}();
-        co_await bgTask.runOnProcessor(WorkerGroup::BG1);
+		}().runOnProcessor(WorkerGroup::BG1);
+
+		LOG_TRACE("----------------------------------------");
+
+        co_await []()->nd::Task {
+            LOG_TRACE("-> bg task in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
+            co_await nd::TimeWaiter(2000);
+            LOG_TRACE("<- bg task in thread id:0x" << std::hex << this_thread::get_id() << std::dec << " after 2 secs later");
+            co_return;
+		}().runOnProcessor(WorkerGroup::BG2);
+
+		LOG_TRACE("----------------------------------------");
+
+        // you should see the destruction log of upper promise and task
+        // main's resume is called in the BG1 thread, it can be run before the destruction of upper promise and task.
+        // so wait for a while to see the log
+        co_await nd::TimeWaiter(1);
+
 		LOG_TRACE("<- main task in thread id:0x" << std::hex << this_thread::get_id() << std::dec);
 	}();
 

@@ -106,7 +106,7 @@ namespace nd
             auto id = m_id.id();
 			m_running_worker->addJob(new nd::Job{[controller, id](){
                 if (!controller) { return; }
-				LOG_TRACE("coroutine task-" << id << " run in worker");
+				LOG_TRACE("task-" << id << " run in worker");
 				controller->handle().resume();
 			}});
             return;
@@ -183,10 +183,10 @@ namespace nd
         Task(CorotineControllerSharedPtr& controller)
             : BaseTask(controller)
         {
-			LOG_TRACE("coroutine task-" << m_id << " created");
+			LOG_TRACE("task-" << m_id << " created");
         }
         virtual ~Task(){
-			LOG_TRACE("coroutine task-" << m_id << " destroyed");
+			LOG_TRACE("task-" << m_id << " destroyed");
         }
 
         Task& runOnProcessor(int workerGroupId = PreDefWorkerGroup::Current, const SessionId theId = 0)

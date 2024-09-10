@@ -39,13 +39,16 @@ void CoroutineController::onCoroutineReturn() {
 
 void CoroutineController::onCoroutineDone() {
 	std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
-	m_coroutine = nullptr;
+	if (m_coroutine) {
+		//m_coroutine.destroy();
+		m_coroutine = nullptr;
+	}
 }
 
 
 
 Task TaskPromise::get_return_object() noexcept
 {
-	LOG_TRACE("task promise get_return_object");
+	LOG_TRACE("promise-" << m_id << " get_return_object");
     return Task{m_controller};
 }
