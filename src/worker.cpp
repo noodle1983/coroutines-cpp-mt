@@ -29,6 +29,8 @@ Worker::Worker()
 
 Worker::~Worker()
 {
+    assert(isJobQueueEmpty());           // jobs should be empty for a elegant exit!
+    assert(min_heap_empty(&timerHeapM)); // timer heap shoude be empty for a elegant exit!
     min_heap_dtor(&timerHeapM);	
 }
 
@@ -156,7 +158,12 @@ void Worker::thread_main()
     currentThreadId = std::this_thread::get_id();
     currentWorkerGroupId = workerGroupIdM;
     currentWorkerId = workerIdM;
-	snprintf(workerName, sizeof(workerName)-1, "[%s %d/%d]", workerGroupNameM.c_str(), workerIdM, workerNumM);
+    if (workerNumM > 1) {
+        snprintf(workerName, sizeof(workerName) - 1, "[%s %d/%d]", workerGroupNameM.c_str(), workerIdM, workerNumM);
+    }
+    else {
+        snprintf(workerName, sizeof(workerName) - 1, "[%s]", workerGroupNameM.c_str());
+    }
     LOG_TRACE("worker start");
 
     while (!isToStopM &&!(isWaitStopM && isJobQueueEmpty()))

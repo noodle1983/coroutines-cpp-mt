@@ -7,6 +7,7 @@
 #include <fstream>
 #include <thread>
 #include <algorithm>
+#include <chrono>
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -52,15 +53,20 @@ const char* const g_loglevel_str[] = {
 };
 template<typename StreamType>
 StreamType& formatLogPrefix(StreamType& os, const char* levelStr, const char* file, const unsigned lineno) {
-	time_t rawTime;
 	struct tm info;
 	char timeStr[80];
 
-	time(&rawTime);
-	localtime_r(&rawTime, &info);
-	strftime(timeStr, 80, "%Y-%m-%d %H:%M:%S ", &info);
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    auto ms_time = duration_cast<milliseconds>(now.time_since_epoch()).count();
+    time_t in_time_t = ms_time / 1000;
+    auto ms_time_left = ms_time % 1000;
 
-	os << timeStr << levelStr << nd::Worker::getCurrWorkerName() << "(" << file << ":" << lineno << ") ";
+	localtime_r(&in_time_t, &info);
+	strftime(timeStr, 80, "%Y-%m-%d %H:%M:%S", &info);
+
+	os << timeStr << '.' << std::setfill('0') << std::setw(3) << ms_time_left << " " 
+        << levelStr << nd::Worker::getCurrWorkerName() << "(" << file << ":" << lineno << ") ";
     return os;
 }
 
