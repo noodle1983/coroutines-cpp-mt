@@ -9,47 +9,45 @@ using namespace nd;
 
 //-----------------------------------------------------------------------------
 
-WorkerGroup::WorkerGroup(unsigned theGroupId, const unsigned theThreadCount, const std::string& theName)
-    : groupIdM(theGroupId)
-    , threadCountM(theThreadCount)
-    , workersM(NULL)
-    , nameM(theName)
-    , waitStopM(false)
-{
-}
+WorkerGroup::WorkerGroup(unsigned the_group_id, const unsigned the_thread_count,
+                         const std::string& the_name)
+    : groupIdM(the_group_id),
+      threadCountM(the_thread_count),
+      workersM(NULL),
+      nameM(the_name),
+      waitStopM(false) {}
 
 //-----------------------------------------------------------------------------
 
 WorkerGroup::~WorkerGroup()
 {
-    if (workersM) {
-        if (waitStopM){
-            waitStop();
-        }
-        else {
-            stop();
-        }
+  if (workersM != nullptr) {
+    if (waitStopM) {
+      waitStop();
+    } else {
+      stop();
     }
+  }
 }
 
 //-----------------------------------------------------------------------------
 
-void WorkerGroup::start(bool toWaitStop)
-{
-    waitStopM = toWaitStop;
-    if (0 == threadCountM)
-        return;
+void WorkerGroup::start(bool to_wait_stop) {
+  waitStopM = to_wait_stop;
+  if (0 == threadCountM) {
+    return;
+  }
 
-    if (NULL != workersM)
-        return;
+  if (NULL != workersM) {
+    return;
+  }
 
-    workersM = new Worker[threadCountM];
-    threadsM.reserve(threadCountM);
-    for (unsigned i = 0; i < threadCountM; i++)
-    {
-        workersM[i].init(groupIdM, i, threadCountM, nameM);
-        threadsM.push_back(thread(&Worker::thread_main, &workersM[i]));
-    }
+  workersM = new Worker[threadCountM];
+  threadsM.reserve(threadCountM);
+  for (unsigned i = 0; i < threadCountM; i++) {
+    workersM[i].init(groupIdM, i, threadCountM, nameM);
+    threadsM.push_back(thread(&Worker::thread_main, &workersM[i]));
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -57,8 +55,9 @@ void WorkerGroup::start(bool toWaitStop)
 void WorkerGroup::waitStop()
 {
     lock_guard<mutex> lock(stopMutexM);
-    if (NULL == workersM)
-        return;
+    if (NULL == workersM) {
+      return;
+    }
 
     unsigned int i = 0;
     while(true)
@@ -73,10 +72,8 @@ void WorkerGroup::waitStop()
         {
             break;
         }
-        else
-        {
-            this_thread::sleep_for(chrono::milliseconds(1));
-        }
+
+        this_thread::sleep_for(chrono::milliseconds(1));
     }
     for (unsigned i = 0; i < threadCountM; i++)
     {
@@ -91,8 +88,9 @@ void WorkerGroup::waitStop()
 void WorkerGroup::stop()
 {
     lock_guard<mutex> lock(stopMutexM);
-    if (NULL == workersM)
-        return;
+    if (NULL == workersM) {
+      return;
+    }
 
     for (unsigned i = 0; i < threadCountM; i++)
     {

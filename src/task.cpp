@@ -26,11 +26,10 @@ void CoroutineController::onCoroutineReturn() {
 		// task is waited in other coroutine, so it ought to be exist
 		std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
 		for (auto& waiting_task : m_waiting_tasks) {
-			auto task = std::get<0>(waiting_task);
-			auto worker = std::get<1>(waiting_task);
-			worker->addJob(new nd::Job{ [task]() {
-				task->onCoroutineReturn();
-			} });
+                  auto* task = std::get<0>(waiting_task);
+                  auto* worker = std::get<1>(waiting_task);
+                  worker->addJob(
+                      new nd::Job{[task]() { task->onCoroutineReturn(); }});
 		}
 		m_waiting_tasks.clear();
 	}

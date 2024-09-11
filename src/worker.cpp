@@ -62,92 +62,79 @@ void Worker::waitUntilEmpty()
 
 //-----------------------------------------------------------------------------
 
+void Worker::addJob(Job* the_job) {
+  if (isToStopM || isStopedM) {
+    delete the_job;
+    return;
+  }
 
-void Worker::addJob(Job* theJob)
-{
-    if (isToStopM || isStopedM){
-        delete theJob;
-        return;
-    }
-
-    bool jobQueueEmpty = false;
-    {
-        lock_guard<mutex> lock(queueMutexM);
-        jobQueueEmpty = jobQueueM.empty();
-        jobQueueM.push_back(theJob);
-    }
-    if (jobQueueEmpty)
-    {
-        queueCondM.notify_one();
-    }
+  bool job_queue_empty = false;
+  {
+    lock_guard<mutex> lock(queueMutexM);
+    job_queue_empty = jobQueueM.empty();
+    jobQueueM.push_back(the_job);
+  }
+  if (job_queue_empty) {
+    queueCondM.notify_one();
+  }
 }
 
 //-----------------------------------------------------------------------------
 
-TimerHandle Worker::addLocalTimer(
-        uint64_t theMsTime, 
-		TimerCallback theCallback)
-{
-    if (isToStopM || isWaitStopM){
-        return NULL;
-    }
+TimerHandle Worker::addLocalTimer(uint64_t the_ms_time,
+                                  TimerCallback the_callback) {
+  if (isToStopM || isWaitStopM) {
+    return NULL;
+  }
 
-	bool timerHeapEmpty = min_heap_empty(&timerHeapM);
-    if (128 > min_heap_size(&timerHeapM))
-    {
-        min_heap_reserve(&timerHeapM, 128);
-    }
+  bool timer_heap_empty = min_heap_empty(&timerHeapM) != 0;
+  if (128 > min_heap_size(&timerHeapM)) {
+    min_heap_reserve(&timerHeapM, 128);
+  }
 
-	TimerHandle timeoutEvt = new min_heap_item_t();
-    timeoutEvt->callback = theCallback;
-    timeoutEvt->timeout = std::chrono::steady_clock::now() + std::chrono::milliseconds(theMsTime);
+  TimerHandle timeout_evt = new min_heap_item_t();
+  timeout_evt->callback = the_callback;
+  timeout_evt->timeout =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(the_ms_time);
 
-    if (-1 == min_heap_push(&timerHeapM, timeoutEvt))
-    {
-        LOG_FATAL("not enough memory!");
-        exit(-1);
-    }
-	if (timerHeapEmpty)
-	{
-        queueCondM.notify_one();
-	}
-	return timeoutEvt;
+  if (-1 == min_heap_push(&timerHeapM, timeout_evt)) {
+    LOG_FATAL("not enough memory!");
+    exit(-1);
+  }
+  if (timer_heap_empty) {
+    queueCondM.notify_one();
+  }
+  return timeout_evt;
 }
 
 //-----------------------------------------------------------------------------
 
-void Worker::cancelLocalTimer(TimerHandle& theEvent)
-{
-    if (theEvent == NULL) {return;}
-    min_heap_erase(&timerHeapM, theEvent);
-    delete theEvent;
-	theEvent = NULL;
+void Worker::cancelLocalTimer(TimerHandle& the_event) {
+  if (the_event == NULL) {
+    return;
+  }
+  min_heap_erase(&timerHeapM, the_event);
+  delete the_event;
+  the_event = NULL;
 }
 
 //-----------------------------------------------------------------------------
 
 void Worker::handleLocalTimer()
 {
-    if (!min_heap_empty(&timerHeapM))
-    {
-        auto timeNow = std::chrono::steady_clock::now();
-        while(!min_heap_empty(&timerHeapM)) 
-        {
-            TimerHandle topEvent = min_heap_top(&timerHeapM);
-            if (item_cmp(topEvent->timeout, timeNow, <=))
-            {
-                min_heap_pop(&timerHeapM);
-                (topEvent->callback)();
-                delete topEvent;
-            }
-            else
-            { 
-                break;
-            }
-        } 
+  if (min_heap_empty(&timerHeapM) == 0) {
+    auto time_now = std::chrono::steady_clock::now();
+    while (min_heap_empty(&timerHeapM) == 0) {
+      TimerHandle top_event = min_heap_top(&timerHeapM);
+      if (item_cmp(top_event->timeout, time_now, <=)) {
+        min_heap_pop(&timerHeapM);
+        (top_event->callback)();
+        delete top_event;
+      } else {
+        break;
+      }
     }
-
-
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -201,16 +188,14 @@ void Worker::internalStep()
     //handle timer
     handleLocalTimer();
 
-    unique_lock<mutex> queueLock(queueMutexM);
+    unique_lock<mutex> queue_lock(queueMutexM);
     if (!jobQueueM.empty()) { return; }
 
-    if (!isToStopM && !isWaitStopM && jobQueueM.empty() && !min_heap_empty(&timerHeapM))
-    {
-        queueCondM.wait_for(queueLock, chrono::microseconds(500));
-    }
-    else
-    {
-        queueCondM.wait_for(queueLock, chrono::microseconds(10000));
+    if (!isToStopM && !isWaitStopM && jobQueueM.empty() &&
+        (min_heap_empty(&timerHeapM) == 0)) {
+      queueCondM.wait_for(queue_lock, chrono::microseconds(500));
+    } else {
+      queueCondM.wait_for(queue_lock, chrono::microseconds(10000));
     }
 }
 
