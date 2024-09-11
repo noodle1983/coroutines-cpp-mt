@@ -1,5 +1,5 @@
-#ifndef PROCESSORTYPES_H
-#define PROCESSORTYPES_H
+#ifndef WORKER_TYPES_H
+#define WORKER_TYPES_H
 
 #include <stdint.h>
 #include <list>
@@ -20,5 +20,5 @@ namespace nd{
     };
 };
 
-#endif /* PROCESSORTYPES_H */
+#endif /* WORKER_TYPES_H */
 

@@ -1,7 +1,7 @@
-#include "task.h"
-#include "worker_manager.h"
-#include "TimeWaiter.h"
-#include "log.h"
+#include "task.hpp"
+#include "worker_manager.hpp"
+#include "time_waiter.hpp"
+#include "log.hpp"
 
 #include "gtest/gtest.h"
 

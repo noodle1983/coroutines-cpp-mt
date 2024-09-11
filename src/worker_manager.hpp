@@ -2,8 +2,8 @@
 #define WORKER_MANAGER_H
 
 #include "singleton.hpp"
-#include "worker_group.h"
-#include "worker.h"
+#include "worker_group.hpp"
+#include "worker.hpp"
 
 #include <assert.h>
 #include <string.h>

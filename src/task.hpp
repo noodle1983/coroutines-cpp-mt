@@ -1,6 +1,6 @@
-#include "processor_types.h"
-#include "worker_manager.h"
-#include "log.h"
+#include "worker_types.hpp"
+#include "worker_manager.hpp"
+#include "log.hpp"
 
 #include <atomic>
 #include <coroutine>

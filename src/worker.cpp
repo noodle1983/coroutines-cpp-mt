@@ -1,5 +1,5 @@
-#include "worker.h"
-#include "log.h"
+#include "worker.hpp"
+#include "log.hpp"
 #include "min_heap.h"
 
 #include <assert.h>

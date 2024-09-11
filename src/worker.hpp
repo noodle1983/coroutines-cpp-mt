@@ -8,7 +8,7 @@
 #include <atomic>
 #include <cassert>
 
-#include <processor_types.h>
+#include <worker_types.hpp>
 #include <singleton.hpp>
 #include <min_heap.h>
 

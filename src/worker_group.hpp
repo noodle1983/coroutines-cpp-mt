@@ -1,8 +1,8 @@
 #ifndef WORKER_GROUP_H
 #define WORKER_GROUP_H
 
-#include "processor_types.h"
-#include "worker.h"
+#include "worker_types.hpp"
+#include "worker.hpp"
 #include "singleton.hpp"
 
 #include <string>

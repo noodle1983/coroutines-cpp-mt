@@ -1,5 +1,5 @@
-#include "worker_group.h"
-#include "worker.h"
+#include "worker_group.hpp"
+#include "worker.hpp"
 
 #include <functional>
 #include <chrono>
