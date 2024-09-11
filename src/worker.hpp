@@ -55,7 +55,7 @@ namespace nd
             assert(std::this_thread::get_id() == currentThreadId);
             // a complete worker object but no thread context
             // had to run step() in main to run all the jobs in the queue
-            return Singleton<Worker, 0>::instance();
+            return Singleton<Worker, 0>::Instance();
         }
         static inline Worker* getCurrentWorker(){ 
             assert(currentWorkerM != nullptr);

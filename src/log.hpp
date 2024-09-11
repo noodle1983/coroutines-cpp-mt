@@ -92,7 +92,7 @@ private:
  std::mutex m_mutex;
 };
 
-#define g_file_logger (nd::Singleton<FileLogger, 0>::instance())
+#define g_file_logger (nd::Singleton<FileLogger, 0>::Instance())
 #define FILE_LOG(level, toErr, msg) {\
     if (level >= g_log_level) {\
         const char* filename = __FILE_NAME__; \

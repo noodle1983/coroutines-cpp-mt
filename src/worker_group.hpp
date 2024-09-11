@@ -69,7 +69,7 @@ namespace nd
 
     //template<WorkerGroup theGroup>
     //void process(SessionId theId, Job* job){
-    //    auto processor = Singleton<WorkerGroup, theGroup>::instance();
+    //    auto processor = Singleton<WorkerGroup, theGroup>::Instance();
     //    processor->process(theId, job);
     //}
 

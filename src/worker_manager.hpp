@@ -108,7 +108,7 @@ namespace nd{
 	};
 };
 
-#define g_worker_mgr (nd::Singleton<nd::WorkerManager, 0>::instance())
+#define g_worker_mgr (nd::Singleton<nd::WorkerManager, 0>::Instance())
 
 
 #endif /* WORKER_MANAGER_H */
