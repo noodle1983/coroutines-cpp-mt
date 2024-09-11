@@ -9,51 +9,50 @@ namespace nd {
 	// run in the same thread with the coroutine
 	class TimeWaiter {
 	public:
-		TimeWaiter(uint64_t millisecond) 
-			: m_mstime(millisecond) 
-			, m_timerHandle(nullptr)
-		{}
-		virtual ~TimeWaiter() {
-			reset();
+         TimeWaiter(uint64_t _millisecond)
+             : m_mstime(_millisecond), m_timer_handle(nullptr) {}
+         virtual ~TimeWaiter() { Reset(); }
+
+         TimeWaiter& Reset(uint64_t _time = 0) {
+           assert(!m_coroutine);
+           if (m_timer_handle != nullptr) {
+             Worker::GetCurrentWorker()->CancelLocalTimer(m_timer_handle);
+           }
+           if (_time > 0) {
+             m_mstime = _time;
+           }
+           return *this;
+         }
+
+		// NOLINTNEXTLINE
+        bool await_ready() noexcept {
+          if (m_mstime == 0 || (m_timer_handle != nullptr)) {
+            return true;
+          }
+
+          m_timer_handle =
+              Worker::GetCurrentWorker()->AddLocalTimer(m_mstime, [this]() {
+                m_timer_handle = nullptr;
+                if (m_coroutine) {
+                  auto coroutine = m_coroutine;
+                  m_coroutine = nullptr;
+                  coroutine.resume();
+                }
+              });
+          return false;
 		}
 
-		TimeWaiter& reset(uint64_t time = 0) {
-			assert(!m_coroutine);
-			if (m_timerHandle) {
-				Worker::GetCurrentWorker()->CancelLocalTimer(m_timerHandle);
-			}
-			if (time > 0) {
-				m_mstime = time;
-			}
-			return *this;
-		}
-
-        bool await_ready() noexcept { 
-			if (m_mstime == 0 || m_timerHandle) {
-				return true;
-			}
-
-			m_timerHandle = Worker::GetCurrentWorker()->AddLocalTimer(m_mstime, [this]() {
-				m_timerHandle = nullptr;
-				if (m_coroutine) {
-					auto coroutine = m_coroutine;
-					m_coroutine = nullptr;
-					coroutine.resume();
-				}
-			});
-			return false;
-		}
-
-        void await_suspend(std::coroutine_handle<> awaitingCoroutine) noexcept {
-            m_coroutine = awaitingCoroutine;
+		// NOLINTNEXTLINE
+        void await_suspend(std::coroutine_handle<> _awaiting_coroutine) noexcept {
+            m_coroutine = _awaiting_coroutine;
         }
+
+		// NOLINTNEXTLINE
 		void await_resume() const noexcept { }
-
-
 
 	private:
 		uint64_t m_mstime;
-		TimerHandle m_timerHandle;
+		TimerHandle m_timer_handle;
 		std::coroutine_handle<> m_coroutine;
 	};
 }
