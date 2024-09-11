@@ -35,7 +35,7 @@ namespace nd{
 			assert(m_worker_groups[worker_group_id] == nullptr);
 
 			m_worker_groups[worker_group_id] = new WorkerGroup(worker_group_id, processor_num, theName);
-			m_worker_groups[worker_group_id]->start();
+			m_worker_groups[worker_group_id]->Start();
 		}
 
 		void stop(unsigned worker_group_id) {
@@ -44,7 +44,7 @@ namespace nd{
 				return;
 			}
 
-			m_worker_groups[worker_group_id]->waitStop();
+			m_worker_groups[worker_group_id]->WaitStop();
 			delete m_worker_groups[worker_group_id];
 			m_worker_groups[worker_group_id] = nullptr;
 		}
@@ -75,7 +75,7 @@ namespace nd{
 			assert(0 <= worker_group_id && worker_group_id < m_max_worker_group);
 			assert(m_worker_groups[worker_group_id] != nullptr);
 
-			return m_worker_groups[worker_group_id]->getWorker(session_id);
+			return m_worker_groups[worker_group_id]->GetWorker(session_id);
 		}
 
 		void runOnWorkerGroup(int worker_group_id, size_t session_id, Job* job) {

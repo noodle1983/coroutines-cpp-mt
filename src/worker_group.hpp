@@ -22,49 +22,46 @@ namespace nd
         //template<WorkerGroup theGroup>
         //static void process(SessionId theId, Job* job);
 
-        WorkerGroup(const unsigned theGroupId, const unsigned theThreadCount, const std::string& theName = "xxx");
-        ~WorkerGroup();
+		WorkerGroup(unsigned _group_id, unsigned _thread_count,
+					const std::string& _name = "xxx");
+		~WorkerGroup();
 
-        void start(bool toWaitStop = false);
-        // must not call stop in its worker
-        void waitStop();
-        void stop();
+		void Start(bool _to_wait_stop = false);
+		// must not call stop in its worker
+		void WaitStop();
+		void Stop();
 
-        inline Worker* getWorker(const size_t sessionId){
-            if (NULL == workersM) {return NULL;}
-            unsigned workerId = sessionId % threadCountM;
-            return &workersM[workerId];
-        }
+		Worker* GetWorker(const size_t _session_id) {
+		  if (NULL == m_workers) {
+			return NULL;
+		  }
+		  unsigned worker_id = _session_id % m_thread_count;
+		  return &m_workers[worker_id];
+		}
 
-		TimerHandle AddLocalTimer(
-                const SessionId theId, 
-				const unsigned long long theMsTime, 
-				TimerCallback theCallback)
-        {
-            return getWorker(theId)->AddLocalTimer(theMsTime, theCallback);
-        }
-		inline void CancelLocalTimer(
-                const SessionId theId, 
-                TimerHandle& theEvent)
-        {
-            return getWorker(theId)->CancelLocalTimer(theEvent);
-        }
+		TimerHandle AddLocalTimer(const SessionId _id,
+								  const unsigned long long _ms_time,
+								  TimerCallback _callback) {
+		  return GetWorker(_id)->AddLocalTimer(_ms_time,
+												   _callback);
+		}
+		void CancelLocalTimer(const SessionId _id,
+							  TimerHandle& _event) {
+		  return GetWorker(_id)->CancelLocalTimer(_event);
+		}
 
-        void AddJob(
-                const SessionId theId, 
-                Job* theJob)
-        {
-            getWorker(theId)->AddJob(theJob);
-        }
+		void AddJob(const SessionId _id, Job* _job) {
+		  GetWorker(_id)->AddJob(_job);
+		}
 
     private:
-        unsigned groupIdM;
-        unsigned threadCountM;
-        Worker* workersM;
-        std::vector<std::thread> threadsM;
-        std::string nameM;
-        bool waitStopM; 
-        std::mutex stopMutexM;
+		unsigned m_group_id;
+		unsigned m_thread_count;
+		Worker* m_workers;
+		std::vector<std::thread> m_threads;
+		std::string m_name;
+		bool m_wait_stop;
+		std::mutex m_stop_mutex;
     };
 
     //template<WorkerGroup theGroup>

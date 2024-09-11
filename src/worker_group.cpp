@@ -9,53 +9,54 @@ using namespace nd;
 
 //-----------------------------------------------------------------------------
 
-WorkerGroup::WorkerGroup(unsigned the_group_id, const unsigned the_thread_count,
-                         const std::string& the_name)
-    : groupIdM(the_group_id),
-      threadCountM(the_thread_count),
-      workersM(NULL),
-      nameM(the_name),
-      waitStopM(false) {}
+WorkerGroup::WorkerGroup(unsigned _group_id,
+                         const unsigned _thread_count,
+                         const std::string& _name)
+    : m_group_id(_group_id),
+      m_thread_count(_thread_count),
+      m_workers(NULL),
+      m_name(_name),
+      m_wait_stop(false) {}
 
 //-----------------------------------------------------------------------------
 
 WorkerGroup::~WorkerGroup()
 {
-  if (workersM != nullptr) {
-    if (waitStopM) {
-      waitStop();
+  if (m_workers != nullptr) {
+    if (m_wait_stop) {
+      WaitStop();
     } else {
-      stop();
+      Stop();
     }
   }
 }
 
 //-----------------------------------------------------------------------------
 
-void WorkerGroup::start(bool to_wait_stop) {
-  waitStopM = to_wait_stop;
-  if (0 == threadCountM) {
+void WorkerGroup::Start(bool _to_wait_stop) {
+  m_wait_stop = _to_wait_stop;
+  if (0 == m_thread_count) {
     return;
   }
 
-  if (NULL != workersM) {
+  if (NULL != m_workers) {
     return;
   }
 
-  workersM = new Worker[threadCountM];
-  threadsM.reserve(threadCountM);
-  for (unsigned i = 0; i < threadCountM; i++) {
-    workersM[i].Init(groupIdM, i, threadCountM, nameM);
-    threadsM.push_back(thread(&Worker::ThreadMain, &workersM[i]));
+  m_workers = new Worker[m_thread_count];
+  m_threads.reserve(m_thread_count);
+  for (unsigned i = 0; i < m_thread_count; i++) {
+    m_workers[i].Init(m_group_id, i, m_thread_count, m_name);
+    m_threads.push_back(thread(&Worker::ThreadMain, &m_workers[i]));
   }
 }
 
 //-----------------------------------------------------------------------------
 
-void WorkerGroup::waitStop()
+void WorkerGroup::WaitStop()
 {
-    lock_guard<mutex> lock(stopMutexM);
-    if (NULL == workersM) {
+    lock_guard<mutex> lock(m_stop_mutex);
+    if (NULL == m_workers) {
       return;
     }
 
@@ -63,45 +64,45 @@ void WorkerGroup::waitStop()
     while(true)
     {
         /* check the worker once only */
-        if(i < threadCountM && workersM[i].IsJobQueueEmpty())
+        if(i < m_thread_count && m_workers[i].IsJobQueueEmpty())
         {
-            workersM[i].WaitStop();
+            m_workers[i].WaitStop();
             i++;
         }
-        if (i == threadCountM)
+        if (i == m_thread_count)
         {
             break;
         }
 
         this_thread::sleep_for(chrono::milliseconds(1));
     }
-    for (unsigned i = 0; i < threadCountM; i++)
+    for (unsigned i = 0; i < m_thread_count; i++)
     {
-        threadsM[i].join();
+        m_threads[i].join();
     }
-    delete []workersM;
-    workersM = NULL;
+    delete []m_workers;
+    m_workers = NULL;
 }
 
 //-----------------------------------------------------------------------------
 
-void WorkerGroup::stop()
+void WorkerGroup::Stop()
 {
-    lock_guard<mutex> lock(stopMutexM);
-    if (NULL == workersM) {
+    lock_guard<mutex> lock(m_stop_mutex);
+    if (NULL == m_workers) {
       return;
     }
 
-    for (unsigned i = 0; i < threadCountM; i++)
+    for (unsigned i = 0; i < m_thread_count; i++)
     {
-        workersM[i].Stop();
+        m_workers[i].Stop();
     }
-    for (unsigned i = 0; i < threadCountM; i++)
+    for (unsigned i = 0; i < m_thread_count; i++)
     {
-        threadsM[i].join();
+        m_threads[i].join();
     }
-    delete []workersM;
-    workersM = NULL;
+    delete []m_workers;
+    m_workers = NULL;
 }
 
 //-----------------------------------------------------------------------------
