@@ -41,9 +41,9 @@
 
 #endif
 
-const char* const g_log_filename = "log.h";
-enum LogLevel{ TRACE = 0, DEBUG, INFO, WARN, ERROR, FATAL };
-const int g_log_level = TRACE;
+const char* const g_log_filename = "log.log";
+enum class LogLevel { TRACE = 0, DEBUG, INFO, WARN, ERROR, FATAL };
+const int g_log_level = (int)LogLevel::TRACE;
 const char* const g_loglevel_str[] = {
     "TRACE ",
     "DEBUG ",
@@ -52,51 +52,51 @@ const char* const g_loglevel_str[] = {
     "ERR   ",
     "FATAL "
 };
-template<typename StreamType>
-StreamType& formatLogPrefix(StreamType& os, const char* levelStr, const char* file, const unsigned lineno) {
-	struct tm info;
-	char timeStr[80];
 
-    using namespace std::chrono;
-    auto now = system_clock::now();
-    auto ms_time = duration_cast<milliseconds>(now.time_since_epoch()).count();
-    time_t in_time_t = ms_time / 1000;
-    auto ms_time_left = ms_time % 1000;
+template <typename StreamType>
+StreamType& FormatLogPrefix(StreamType& _os, const char* _level_str,
+                            const char* _file, const unsigned _lineno) {
+  struct tm info;
+  char time_str[80];
 
-	localtime_r(&in_time_t, &info);
-	strftime(timeStr, 80, "%Y-%m-%d %H:%M:%S", &info);
+  using namespace std::chrono;
+  auto now = system_clock::now();
+  auto ms_time = duration_cast<milliseconds>(now.time_since_epoch()).count();
+  time_t in_time_t = ms_time / 1000;
+  auto ms_time_left = ms_time % 1000;
 
-	os << timeStr << '.' << std::setfill('0') << std::setw(3) << ms_time_left << " " 
-        << levelStr << nd::Worker::getCurrWorkerName() << "(" << file << ":" << lineno << ") ";
-    return os;
+  localtime_r(&in_time_t, &info);
+  strftime(time_str, 80, "%Y-%m-%d %H:%M:%S", &info);
+
+  _os << time_str << '.' << std::setfill('0') << std::setw(3) << ms_time_left
+     << " " << _level_str << nd::Worker::getCurrWorkerName() << "(" << _file << ":"
+     << _lineno << ") ";
+  return _os;
 }
 
 class FileLogger{
 public:
-    FileLogger(){
-        outM.open(g_log_filename);
-    }
+ FileLogger() { m_out.open(g_log_filename); }
 
-    std::ofstream& stream(const char* levelStr, const char* file, const unsigned lineno){
-        return formatLogPrefix(outM, levelStr, file, lineno);
-    }
+ std::ofstream& Stream(const char* _level_str, const char* _file,
+                       const unsigned _lineno) {
+   return FormatLogPrefix(m_out, _level_str, _file, _lineno);
+ }
 
-    std::mutex& mutex(){return mutexM;}
+ std::mutex& Mutex() { return m_mutex; }
 
-    virtual ~FileLogger(){
-        outM.flush();
-    }
+ virtual ~FileLogger() { m_out.flush(); }
 
 private:
-    std::ofstream outM;
-    std::mutex mutexM;
+ std::ofstream m_out;
+ std::mutex m_mutex;
 };
 
 #define g_file_logger (nd::Singleton<FileLogger, 0>::instance())
 #define FILE_LOG(level, toErr, msg) {\
     if (level >= g_log_level) {\
         const char* filename = __FILE_NAME__; \
-        std::lock_guard<std::mutex> lock(g_file_logger->mutex()); \
+        std::lock_guard<std::mutex> lock(g_file_logger->Mutex()); \
         g_file_logger->stream(g_loglevel_str[level], filename, __LINE__) << msg << std::endl; \
         if(toErr){std::cerr << msg << std::endl;} \
     }\
@@ -105,17 +105,17 @@ private:
 #define STD_LOG(level, toErr, msg) {\
     if (level >= g_log_level) {\
         const char* filename = __FILE_NAME__; \
-        std::lock_guard<std::mutex> lock(g_file_logger->mutex()); \
-        formatLogPrefix(std::cout, g_loglevel_str[level], filename, __LINE__) << msg << std::endl; \
+        std::lock_guard<std::mutex> lock(g_file_logger->Mutex()); \
+        FormatLogPrefix(std::cout, g_loglevel_str[level], filename, __LINE__) << msg << std::endl; \
     }\
 }
 
 //log relate
-#define LOG_TRACE(msg) STD_LOG(0, false, msg)
-#define LOG_DEBUG(msg) STD_LOG(1, false, msg)
-#define LOG_INFO (msg) STD_LOG(2, false, msg)
-#define LOG_WARN (msg) STD_LOG(3, false, msg)
-#define LOG_ERROR(msg) STD_LOG(4, true,  msg)
-#define LOG_FATAL(msg) STD_LOG(5, true,  msg)
+#define LOG_TRACE(msg) STD_LOG(((int)LogLevel::TRACE), false, msg)
+#define LOG_DEBUG(msg) STD_LOG(((int)LogLevel::DEBUG), false, msg)
+#define LOG_INFO (msg) STD_LOG(((int)LogLevel::INFO), false, msg)
+#define LOG_WARN (msg) STD_LOG(((int)LogLevel::WARN), false, msg)
+#define LOG_ERROR(msg) STD_LOG(((int)LogLevel::ERROR), true,  msg)
+#define LOG_FATAL(msg) STD_LOG(((int)LogLevel::FATAL), true,  msg)
 
 #endif
