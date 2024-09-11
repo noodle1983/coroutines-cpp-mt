@@ -69,7 +69,7 @@ StreamType& FormatLogPrefix(StreamType& _os, const char* _level_str,
   strftime(time_str, 80, "%Y-%m-%d %H:%M:%S", &info);
 
   _os << time_str << '.' << std::setfill('0') << std::setw(3) << ms_time_left
-     << " " << _level_str << nd::Worker::getCurrWorkerName() << "(" << _file << ":"
+     << " " << _level_str << nd::Worker::GetCurrWorkerName() << "(" << _file << ":"
      << _lineno << ") ";
   return _os;
 }

@@ -36,25 +36,25 @@ namespace nd
             return &workersM[workerId];
         }
 
-		TimerHandle addLocalTimer(
+		TimerHandle AddLocalTimer(
                 const SessionId theId, 
 				const unsigned long long theMsTime, 
 				TimerCallback theCallback)
         {
-            return getWorker(theId)->addLocalTimer(theMsTime, theCallback);
+            return getWorker(theId)->AddLocalTimer(theMsTime, theCallback);
         }
-		inline void cancelLocalTimer(
+		inline void CancelLocalTimer(
                 const SessionId theId, 
                 TimerHandle& theEvent)
         {
-            return getWorker(theId)->cancelLocalTimer(theEvent);
+            return getWorker(theId)->CancelLocalTimer(theEvent);
         }
 
-        void addJob(
+        void AddJob(
                 const SessionId theId, 
                 Job* theJob)
         {
-            getWorker(theId)->addJob(theJob);
+            getWorker(theId)->AddJob(theJob);
         }
 
     private:

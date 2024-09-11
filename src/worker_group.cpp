@@ -45,8 +45,8 @@ void WorkerGroup::start(bool to_wait_stop) {
   workersM = new Worker[threadCountM];
   threadsM.reserve(threadCountM);
   for (unsigned i = 0; i < threadCountM; i++) {
-    workersM[i].init(groupIdM, i, threadCountM, nameM);
-    threadsM.push_back(thread(&Worker::thread_main, &workersM[i]));
+    workersM[i].Init(groupIdM, i, threadCountM, nameM);
+    threadsM.push_back(thread(&Worker::ThreadMain, &workersM[i]));
   }
 }
 
@@ -63,9 +63,9 @@ void WorkerGroup::waitStop()
     while(true)
     {
         /* check the worker once only */
-        if(i < threadCountM && workersM[i].isJobQueueEmpty())
+        if(i < threadCountM && workersM[i].IsJobQueueEmpty())
         {
-            workersM[i].waitStop();
+            workersM[i].WaitStop();
             i++;
         }
         if (i == threadCountM)
@@ -94,7 +94,7 @@ void WorkerGroup::stop()
 
     for (unsigned i = 0; i < threadCountM; i++)
     {
-        workersM[i].stop();
+        workersM[i].Stop();
     }
     for (unsigned i = 0; i < threadCountM; i++)
     {
@@ -108,14 +108,14 @@ void WorkerGroup::stop()
 
 //template<>
 //void WorkerGroup::process<(WorkerGroup)PreDefWorkerGroup::CurrentWorker>(SessionId theId, Job* job){
-//    Worker::getCurrentWorker()->process(job);
+//    Worker::GetCurrentWorker()->process(job);
 //}
 //
 ////-----------------------------------------------------------------------------
 //
 //template<>
 //void WorkerGroup::process<(WorkerGroup)PreDefWorkerGroup::Main>(SessionId theId, Job* job){
-//    Worker::getMainWorker()->process(job);
+//    Worker::GetMainWorker()->process(job);
 //}
 
 //-----------------------------------------------------------------------------

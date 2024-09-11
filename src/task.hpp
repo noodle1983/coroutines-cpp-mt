@@ -104,7 +104,7 @@ namespace nd
 
             auto controller = m_controller;
             auto id = m_id.id();
-			m_running_worker->addJob(new nd::Job{[controller, id](){
+			m_running_worker->AddJob(new nd::Job{[controller, id](){
                 if (!controller) { return; }
 				LOG_TRACE("task-" << id << " run in worker");
 				controller->handle().resume();
@@ -198,7 +198,7 @@ namespace nd
         bool await_ready() const noexcept { return isDone(); }
         void await_suspend(std::coroutine_handle<> awaitingCoroutineController) noexcept {
             parentCoroutineControllerM = awaitingCoroutineController;
-            waitReturn(Worker::getCurrentWorker());
+            waitReturn(Worker::GetCurrentWorker());
         }
         virtual void onCoroutineReturn () override {
             BaseTask::onCoroutineReturn();
@@ -212,7 +212,7 @@ namespace nd
         void waitInMain()
         {
             while (!isDone()) {
-                Worker::getCurrentWorker()->step();
+                Worker::GetCurrentWorker()->Step();
             }
         }
 

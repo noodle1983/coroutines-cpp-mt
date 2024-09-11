@@ -66,10 +66,10 @@ namespace nd{
 
 		Worker* getWorker(unsigned worker_group_id, size_t session_id) {
 			if (worker_group_id == PreDefWorkerGroup::Main) {
-				return Worker::getMainWorker();
+				return Worker::GetMainWorker();
 			}
 			if (worker_group_id == PreDefWorkerGroup::Current) {
-				return Worker::getCurrentWorker();
+				return Worker::GetCurrentWorker();
 			}
 
 			assert(0 <= worker_group_id && worker_group_id < m_max_worker_group);
@@ -88,15 +88,15 @@ namespace nd{
 
 			assert(0 <= worker_group_id && worker_group_id < m_max_worker_group);
 			assert(m_worker_groups[worker_group_id] != nullptr);
-			m_worker_groups[worker_group_id]->addJob(session_id, job);
+			m_worker_groups[worker_group_id]->AddJob(session_id, job);
 		}
 		
 		void runOnMainThread(Job* job) {
-			Worker::getMainWorker()->addJob(job);
+			Worker::GetMainWorker()->AddJob(job);
 		}
 
 		void runOnCurrentThread(Job* job) {
-			Worker::getCurrentWorker()->addJob(job);
+			Worker::GetCurrentWorker()->AddJob(job);
 		}
 
 

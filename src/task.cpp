@@ -4,14 +4,14 @@ using namespace nd;
 
 void CoroutineController::addWaitingTask(BaseTask* task, Worker* worker) {
 	if (isDone()) {
-		worker->addJob(new nd::Job{ [task]() {
+		worker->AddJob(new nd::Job{ [task]() {
 			task->onCoroutineReturn();
 		} });
 		return;
 	}
 	std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
 	if (m_coroutine == nullptr) {
-		worker->addJob(new nd::Job{ [task]() {
+		worker->AddJob(new nd::Job{ [task]() {
 			task->onCoroutineReturn();
 		} });
 		return;
@@ -28,7 +28,7 @@ void CoroutineController::onCoroutineReturn() {
 		for (auto& waiting_task : m_waiting_tasks) {
                   auto* task = std::get<0>(waiting_task);
                   auto* worker = std::get<1>(waiting_task);
-                  worker->addJob(
+                  worker->AddJob(
                       new nd::Job{[task]() { task->onCoroutineReturn(); }});
 		}
 		m_waiting_tasks.clear();

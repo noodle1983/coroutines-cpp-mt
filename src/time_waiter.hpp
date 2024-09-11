@@ -20,7 +20,7 @@ namespace nd {
 		TimeWaiter& reset(uint64_t time = 0) {
 			assert(!m_coroutine);
 			if (m_timerHandle) {
-				Worker::getCurrentWorker()->cancelLocalTimer(m_timerHandle);
+				Worker::GetCurrentWorker()->CancelLocalTimer(m_timerHandle);
 			}
 			if (time > 0) {
 				m_mstime = time;
@@ -33,7 +33,7 @@ namespace nd {
 				return true;
 			}
 
-			m_timerHandle = Worker::getCurrentWorker()->addLocalTimer(m_mstime, [this]() {
+			m_timerHandle = Worker::GetCurrentWorker()->AddLocalTimer(m_mstime, [this]() {
 				m_timerHandle = nullptr;
 				if (m_coroutine) {
 					auto coroutine = m_coroutine;
