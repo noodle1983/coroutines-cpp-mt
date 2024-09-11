@@ -25,9 +25,9 @@ protected:
 
 	// usage 2 : start thread
 	nd::Worker::MarkMainThread();
-    g_worker_mgr->init(WorkerGroup::MAX);
-    g_worker_mgr->start(WorkerGroup::BG1, 1, "bg1");
-    g_worker_mgr->start(WorkerGroup::BG2, 1, "bg2");
+    g_worker_mgr->Init(WorkerGroup::MAX);
+    g_worker_mgr->Start(WorkerGroup::BG1, 1, "bg1");
+    g_worker_mgr->Start(WorkerGroup::BG2, 1, "bg2");
 	LOG_DEBUG("worker inited!");
   };
 

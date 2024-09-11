@@ -10,97 +10,101 @@
 
 namespace nd{
 	class WorkerManager{
-		enum {MAX_WORKER_GROUP = 10};
+          enum { MaxWorkerGroup = 10 };
 
-	public:
-		WorkerManager() 
-			: m_max_worker_group(0)
-			, m_worker_groups(nullptr) {
-		}
+         public:
+          WorkerManager() : m_max_worker_group(0), m_worker_groups(nullptr) {}
 
-		~WorkerManager() {
-			stopAll();
-		}
+          ~WorkerManager() { StopAll(); }
 
-		void init(unsigned max_worker_group) {
-			assert(max_worker_group <= MAX_WORKER_GROUP);
-			m_max_worker_group = max_worker_group;
+          void Init(unsigned _max_worker_group) {
+            assert(_max_worker_group <= MaxWorkerGroup);
+            m_max_worker_group = _max_worker_group;
 
-			m_worker_groups = new WorkerGroup*[m_max_worker_group];
-			memset(m_worker_groups, 0, sizeof(WorkerGroup*) * m_max_worker_group);
-		}
+            m_worker_groups = new WorkerGroup*[m_max_worker_group];
+            memset(m_worker_groups, 0,
+                   sizeof(WorkerGroup*) * m_max_worker_group);
+          }
 
-		void start(unsigned worker_group_id, signed processor_num, const std::string& theName = "xxx") {
-			assert(worker_group_id < m_max_worker_group);
-			assert(m_worker_groups[worker_group_id] == nullptr);
+          void Start(unsigned _worker_group_id, signed _processor_num,
+                     const std::string& _the_name = "xxx") {
+            assert(_worker_group_id < m_max_worker_group);
+            assert(m_worker_groups[_worker_group_id] == nullptr);
 
-			m_worker_groups[worker_group_id] = new WorkerGroup(worker_group_id, processor_num, theName);
-			m_worker_groups[worker_group_id]->Start();
-		}
+            m_worker_groups[_worker_group_id] =
+                new WorkerGroup(_worker_group_id, _processor_num, _the_name);
+            m_worker_groups[_worker_group_id]->Start();
+          }
 
-		void stop(unsigned worker_group_id) {
-			assert(worker_group_id < m_max_worker_group);
-			if (m_worker_groups[worker_group_id] == nullptr) {
-				return;
-			}
+          void Stop(unsigned _worker_group_id) {
+            assert(_worker_group_id < m_max_worker_group);
+            if (m_worker_groups[_worker_group_id] == nullptr) {
+              return;
+            }
 
-			m_worker_groups[worker_group_id]->WaitStop();
-			delete m_worker_groups[worker_group_id];
-			m_worker_groups[worker_group_id] = nullptr;
-		}
+            m_worker_groups[_worker_group_id]->WaitStop();
+            delete m_worker_groups[_worker_group_id];
+            m_worker_groups[_worker_group_id] = nullptr;
+          }
 
-		void stopAll() {
-			if (m_max_worker_group == 0) { return; }
-			if (m_worker_groups == nullptr) { return; }
+          void StopAll() {
+            if (m_max_worker_group == 0) {
+              return;
+            }
+            if (m_worker_groups == nullptr) {
+              return;
+            }
 
-			for (unsigned i = 0; i < m_max_worker_group; ++i) {
-				if (m_worker_groups[i] == nullptr) {
-					continue;
-				}
+            for (unsigned i = 0; i < m_max_worker_group; ++i) {
+              if (m_worker_groups[i] == nullptr) {
+                continue;
+              }
 
-				stop(i);
-			}
-			delete[] m_worker_groups;
-			m_worker_groups = nullptr;
-		}
+              Stop(i);
+            }
+            delete[] m_worker_groups;
+            m_worker_groups = nullptr;
+          }
 
-		Worker* getWorker(unsigned worker_group_id, size_t session_id) {
-			if (worker_group_id == PreDefWorkerGroup::Main) {
-				return Worker::GetMainWorker();
-			}
-			if (worker_group_id == PreDefWorkerGroup::Current) {
-				return Worker::GetCurrentWorker();
-			}
+          Worker* GetWorker(unsigned _worker_group_id, size_t _session_id) {
+            if (_worker_group_id == PreDefWorkerGroup::Main) {
+              return Worker::GetMainWorker();
+            }
+            if (_worker_group_id == PreDefWorkerGroup::Current) {
+              return Worker::GetCurrentWorker();
+            }
 
-			assert(0 <= worker_group_id && worker_group_id < m_max_worker_group);
-			assert(m_worker_groups[worker_group_id] != nullptr);
+            assert(0 <= _worker_group_id &&
+                   _worker_group_id < m_max_worker_group);
+            assert(m_worker_groups[_worker_group_id] != nullptr);
 
-			return m_worker_groups[worker_group_id]->GetWorker(session_id);
-		}
+            return m_worker_groups[_worker_group_id]->GetWorker(_session_id);
+          }
 
-		void runOnWorkerGroup(int worker_group_id, size_t session_id, Job* job) {
-			if (worker_group_id == PreDefWorkerGroup::Main) {
-				return runOnMainThread(job);
-			}
-			if (worker_group_id == PreDefWorkerGroup::Current) {
-				return runOnCurrentThread(job);
-			}
+          void RunOnWorkerGroup(int _worker_group_id, size_t _session_id,
+                                Job* _job) {
+            if (_worker_group_id == PreDefWorkerGroup::Main) {
+              return RunOnMainThread(_job);
+            }
+            if (_worker_group_id == PreDefWorkerGroup::Current) {
+              return RunOnCurrentThread(_job);
+            }
 
-			assert(0 <= worker_group_id && worker_group_id < m_max_worker_group);
-			assert(m_worker_groups[worker_group_id] != nullptr);
-			m_worker_groups[worker_group_id]->AddJob(session_id, job);
-		}
-		
-		void runOnMainThread(Job* job) {
-			Worker::GetMainWorker()->AddJob(job);
-		}
+            assert(0 <= _worker_group_id &&
+                   _worker_group_id < m_max_worker_group);
+            assert(m_worker_groups[_worker_group_id] != nullptr);
+            m_worker_groups[_worker_group_id]->AddJob(_session_id, _job);
+          }
 
-		void runOnCurrentThread(Job* job) {
-			Worker::GetCurrentWorker()->AddJob(job);
-		}
+          static void RunOnMainThread(Job* _job) {
+            Worker::GetMainWorker()->AddJob(_job);
+          }
 
+          static void RunOnCurrentThread(Job* _job) {
+            Worker::GetCurrentWorker()->AddJob(_job);
+          }
 
-	protected:
+        protected:
 		size_t m_max_worker_group;
 		WorkerGroup** m_worker_groups;
 

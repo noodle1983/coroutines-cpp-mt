@@ -89,7 +89,7 @@ namespace nd
                 return;
             }
 
-			m_running_worker = g_worker_mgr->getWorker(workerGroupId, theId);
+			m_running_worker = g_worker_mgr->GetWorker(workerGroupId, theId);
 			baseResume();
             return;
         }
