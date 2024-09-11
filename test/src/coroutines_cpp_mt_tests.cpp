@@ -47,7 +47,7 @@ TEST_F(CoroutinesCppMtTest, Wait_Bg_Task_On_Main_Thread) {
             co_await nd::TimeWaiter(1000);
             LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 1 sec later");
             co_return;
-		}().runOnProcessor(WorkerGroup::BG1);
+		}().RunOnProcessor(WorkerGroup::BG1);
 
 		LOG_TRACE("----------------------------------------");
 
@@ -56,7 +56,7 @@ TEST_F(CoroutinesCppMtTest, Wait_Bg_Task_On_Main_Thread) {
             co_await nd::TimeWaiter(2000);
             LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 2 secs later");
             co_return;
-		}().runOnProcessor(WorkerGroup::BG2);
+		}().RunOnProcessor(WorkerGroup::BG2);
 
 		LOG_TRACE("----------------------------------------");
 
@@ -68,8 +68,8 @@ TEST_F(CoroutinesCppMtTest, Wait_Bg_Task_On_Main_Thread) {
 		LOG_TRACE("<- main task in worker" << nd::Worker::GetCurrWorkerName());
 	}();
 
-    mainTask.runOnProcessor(); // run on current worker, which is main worker on the marked main thread.
-    mainTask.waitInMain();
+    mainTask.RunOnProcessor(); // run on current worker, which is main worker on the marked main thread.
+    mainTask.WaitInMain();
     nd::Worker::GetMainWorker()->WaitUntilEmpty();
 }
 
@@ -84,7 +84,7 @@ TEST_F(CoroutinesCppMtTest, Run_Multi_Task_On_Same_Thread) {
             LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 1.5 sec later");
             co_return;
 		}();
-        bgTask1.runOnProcessor(WorkerGroup::BG1);
+        bgTask1.RunOnProcessor(WorkerGroup::BG1);
 
 
         auto bgTask2 = []()->nd::Task {
@@ -93,7 +93,7 @@ TEST_F(CoroutinesCppMtTest, Run_Multi_Task_On_Same_Thread) {
             LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 1 secs later");
             co_return;
 		}();
-        bgTask2.runOnProcessor(WorkerGroup::BG1);
+        bgTask2.RunOnProcessor(WorkerGroup::BG1);
 
         co_await bgTask1;
         co_await bgTask2;
@@ -107,8 +107,8 @@ TEST_F(CoroutinesCppMtTest, Run_Multi_Task_On_Same_Thread) {
 		LOG_TRACE("<- main task in worker" << nd::Worker::GetCurrWorkerName());
 	}();
 
-    mainTask.runOnProcessor(); // run on current worker, which is main worker on the marked main thread.
-    mainTask.waitInMain();
+    mainTask.RunOnProcessor(); // run on current worker, which is main worker on the marked main thread.
+    mainTask.WaitInMain();
     nd::Worker::GetMainWorker()->WaitUntilEmpty();
 }
 

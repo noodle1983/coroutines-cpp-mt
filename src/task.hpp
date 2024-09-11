@@ -22,9 +22,9 @@ namespace nd
     public:
         ID() : m_id(++s_id) {}
         operator size_t() const { return m_id; }
-        size_t id() const { return m_id; }
+        size_t Id() const { return m_id; }
 
-    private:
+       private:
         static std::atomic<size_t> s_id;
         size_t m_id;
     };
@@ -36,31 +36,31 @@ namespace nd
     //-----------------------------------------
     class CoroutineController {
     public:
-        CoroutineController(std::coroutine_handle<> coroutine) : m_coroutine(coroutine) {}
-        ~CoroutineController() {
-            if (m_coroutine) {
-                m_coroutine.destroy();
-				m_coroutine = nullptr;
-            }
+     CoroutineController(std::coroutine_handle<> _coroutine)
+         : m_coroutine(_coroutine) {}
+     ~CoroutineController() {
+       if (m_coroutine) {
+         m_coroutine.destroy();
+         m_coroutine = nullptr;
+       }
         }
 
         // please make sure the handle is valid before use it
         // it is only used in resume
-        std::coroutine_handle<> handle() const { return m_coroutine; }
+        std::coroutine_handle<> Handle() const { return m_coroutine; }
 
-        void addWaitingTask(BaseTask* task, Worker* worker);
-        void onCoroutineReturn();
-		void onCoroutineDone();
+        void AddWaitingTask(BaseTask* _task, Worker* _worker);
+        void OnCoroutineReturn();
+        void OnCoroutineDone();
 
-
-        bool isDone() {
-			std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
-            return m_coroutine == nullptr;
+        bool IsDone() {
+          std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
+          return m_coroutine == nullptr;
         }
 
-        virtual void saveResult() {};
+        virtual void SaveResult() {};
 
-    private:
+       private:
         ID<CoroutineController> m_id;
 
         using WaitingTask = std::tuple<BaseTask*, Worker*>;
@@ -73,57 +73,56 @@ namespace nd
     class BaseTask {
     public:
         friend class CoroutineController;
-        BaseTask(CorotineControllerSharedPtr& controller) 
-            : m_controller(controller) 
-            , m_running_worker(nullptr)
-        {
-        }
+        BaseTask(CorotineControllerSharedPtr& _controller)
+            : m_controller(_controller), m_running_worker(nullptr) {}
         virtual ~BaseTask() {
         }
 
-        void baseRunOnProcessor(int workerGroupId = PreDefWorkerGroup::Current, const SessionId theId = 0)
-        {
-            if (!m_controller) { return; }
-            if (m_running_worker != nullptr) {
-                //LOG_WARN("task can't run twice");
-                return;
-            }
-
-			m_running_worker = g_worker_mgr->GetWorker(workerGroupId, theId);
-			baseResume();
+        void BaseRunOnProcessor(
+            int _worker_group_id = PreDefWorkerGroup::Current,
+            const SessionId _the_id = 0) {
+          if (!m_controller) {
             return;
-        }
-
-        void baseResume() {
-            if (!m_controller) {
-                return;
-            }
-            if (m_running_worker == nullptr) {
-                return;
-            }
-
-            auto controller = m_controller;
-            auto id = m_id.id();
-			m_running_worker->AddJob(new nd::Job{[controller, id](){
-                if (!controller) { return; }
-				LOG_TRACE("task-" << id << " run in worker");
-				controller->handle().resume();
-			}});
+          }
+          if (m_running_worker != nullptr) {
+            // LOG_WARN("task can't run twice");
             return;
+          }
+
+          m_running_worker = g_worker_mgr->GetWorker(_worker_group_id, _the_id);
+          BaseResume();
         }
 
-        void waitReturn(Worker* worker) {
-            if (!m_controller) {
-                return;
+        void BaseResume() {
+          if (!m_controller) {
+            return;
+          }
+          if (m_running_worker == nullptr) {
+            return;
+          }
+
+          auto controller = m_controller;
+          auto id = m_id.Id();
+          m_running_worker->AddJob(new nd::Job{[controller, id]() {
+            if (!controller) {
+              return;
             }
-            m_controller->addWaitingTask(this, worker);
+            LOG_TRACE("task-" << id << " run in worker");
+            controller->Handle().resume();
+          }});
         }
 
-        virtual void onCoroutineReturn() { }
+        void WaitReturn(Worker* _worker) {
+          if (!m_controller) {
+            return;
+          }
+          m_controller->AddWaitingTask(this, _worker);
+        }
 
+        virtual void OnCoroutineReturn() {}
 
-        bool isDone() const {
-            return m_controller == nullptr || m_controller->isDone();
+        bool IsDone() const {
+          return m_controller == nullptr || m_controller->IsDone();
         }
 
     protected:
@@ -143,39 +142,39 @@ namespace nd
         friend class Task;
 
         TaskPromise() noexcept {
-			LOG_TRACE("promise-" << m_id << " created");
+      LOG_TRACE("promise-" << m_id << " created");
 
             m_controller = std::make_shared<CoroutineController>(std::coroutine_handle<TaskPromise>::from_promise(*this));
         }
         virtual ~TaskPromise() {
-			LOG_TRACE("promise-" << m_id << " destroyed");
+      LOG_TRACE("promise-" << m_id << " destroyed");
         }
 
-		// NOLINTNEXTLINE
+    // NOLINTNEXTLINE
         auto initial_suspend() noexcept { 
-			LOG_TRACE("promise-" << m_id << " inital_suspend");
+      LOG_TRACE("promise-" << m_id << " inital_suspend");
             return std::suspend_always{}; 
         }
 
-		// NOLINTNEXTLINE
+    // NOLINTNEXTLINE
         auto final_suspend() noexcept { 
-			LOG_TRACE("promise-" << m_id << " final_suspend");
-            m_controller->onCoroutineDone();
-            return std::suspend_never{};
+      LOG_TRACE("promise-" << m_id << " final_suspend");
+                        m_controller->OnCoroutineDone();
+                        return std::suspend_never{};
         }
 
-		// NOLINTNEXTLINE
+    // NOLINTNEXTLINE
         Task get_return_object() noexcept;
 
-		// NOLINTNEXTLINE
+    // NOLINTNEXTLINE
         void return_void() noexcept {
-			LOG_TRACE("promise-" << m_id << " return void");
-            m_controller->onCoroutineReturn();
+      LOG_TRACE("promise-" << m_id << " return void");
+                        m_controller->OnCoroutineReturn();
         }
 
-		// NOLINTNEXTLINE
+    // NOLINTNEXTLINE
         void unhandled_exception() noexcept { 
-			LOG_TRACE("promise-" << m_id << " unhandled exception");
+      LOG_TRACE("promise-" << m_id << " unhandled exception");
         }
 
     private:
@@ -186,48 +185,45 @@ namespace nd
     class Task : public BaseTask
     {
     public:
-        using promise_type = TaskPromise;
-        Task(CorotineControllerSharedPtr& controller)
-            : BaseTask(controller)
-        {
-			LOG_TRACE("task-" << m_id << " created");
-        }
+     using promise_type = TaskPromise; // NOLINT
+     Task(CorotineControllerSharedPtr& _controller) : BaseTask(_controller) {
+       LOG_TRACE("task-" << m_id << " created");
+     }
         virtual ~Task(){
-			LOG_TRACE("task-" << m_id << " destroyed");
+      LOG_TRACE("task-" << m_id << " destroyed");
         }
 
-        Task& runOnProcessor(int workerGroupId = PreDefWorkerGroup::Current, const SessionId theId = 0)
-        {
-            baseRunOnProcessor(workerGroupId, theId);
-            return *this;
+        Task& RunOnProcessor(int _worker_group_id = PreDefWorkerGroup::Current,
+                             const SessionId _the_id = 0) {
+          BaseRunOnProcessor(_worker_group_id, _the_id);
+          return *this;
         }
 
-		// NOLINTNEXTLINE
-        bool await_ready() const noexcept { return isDone(); }
-		// NOLINTNEXTLINE
-        void await_suspend(std::coroutine_handle<> awaitingCoroutineController) noexcept {
-            parentCoroutineControllerM = awaitingCoroutineController;
-            waitReturn(Worker::GetCurrentWorker());
+                // NOLINTNEXTLINE
+        bool await_ready() const noexcept { return IsDone(); }
+        // NOLINTNEXTLINE
+        void await_suspend(std::coroutine_handle<> _awaiting_coroutine) noexcept {
+          m_parent_coroutine_controller = _awaiting_coroutine;
+          WaitReturn(Worker::GetCurrentWorker());
         }
-        virtual void onCoroutineReturn () override {
-            BaseTask::onCoroutineReturn();
+        virtual void OnCoroutineReturn() override {
+          BaseTask::OnCoroutineReturn();
 
-            parentCoroutineControllerM.resume();
-        } 
-		// NOLINTNEXTLINE
-		void await_resume() const noexcept {}
+          m_parent_coroutine_controller.resume();
+        }
+                // NOLINTNEXTLINE
+    void await_resume() const noexcept {}
 
 
         // wait for the task to complete in main thread
-        void waitInMain()
-        {
-            while (!isDone()) {
-                Worker::GetCurrentWorker()->Step();
-            }
-        }
+    void WaitInMain() {
+      while (!IsDone()) {
+      Worker::GetCurrentWorker()->Step();
+      }
+    }
 
     private:
-        std::coroutine_handle<> parentCoroutineControllerM;
+    std::coroutine_handle<> m_parent_coroutine_controller;
     };
 }
 
