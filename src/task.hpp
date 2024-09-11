@@ -151,22 +151,29 @@ namespace nd
 			LOG_TRACE("promise-" << m_id << " destroyed");
         }
 
+		// NOLINTNEXTLINE
         auto initial_suspend() noexcept { 
 			LOG_TRACE("promise-" << m_id << " inital_suspend");
             return std::suspend_always{}; 
         }
+
+		// NOLINTNEXTLINE
         auto final_suspend() noexcept { 
 			LOG_TRACE("promise-" << m_id << " final_suspend");
             m_controller->onCoroutineDone();
             return std::suspend_never{};
         }
 
+		// NOLINTNEXTLINE
         Task get_return_object() noexcept;
 
+		// NOLINTNEXTLINE
         void return_void() noexcept {
 			LOG_TRACE("promise-" << m_id << " return void");
             m_controller->onCoroutineReturn();
         }
+
+		// NOLINTNEXTLINE
         void unhandled_exception() noexcept { 
 			LOG_TRACE("promise-" << m_id << " unhandled exception");
         }
@@ -195,7 +202,9 @@ namespace nd
             return *this;
         }
 
+		// NOLINTNEXTLINE
         bool await_ready() const noexcept { return isDone(); }
+		// NOLINTNEXTLINE
         void await_suspend(std::coroutine_handle<> awaitingCoroutineController) noexcept {
             parentCoroutineControllerM = awaitingCoroutineController;
             waitReturn(Worker::GetCurrentWorker());
@@ -205,6 +214,7 @@ namespace nd
 
             parentCoroutineControllerM.resume();
         } 
+		// NOLINTNEXTLINE
 		void await_resume() const noexcept {}
 
 
