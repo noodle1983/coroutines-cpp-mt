@@ -52,16 +52,18 @@ const char* const g_loglevel_str[] = {"TRACE ", "DEBUG ", "INFO  ", "WARN  ", "E
 template <typename StreamType>
 StreamType& FormatLogPrefix(StreamType& _os, const char* _level_str, const char* _file, const unsigned _lineno) {
   struct tm info;
-  char time_str[80];
+  constexpr size_t TIME_STR_LEN = 80;
+  char time_str[TIME_STR_LEN];
 
   using namespace std::chrono;
   auto now = system_clock::now();
   auto ms_time = duration_cast<milliseconds>(now.time_since_epoch()).count();
-  time_t in_time_t = ms_time / 1000;
-  auto ms_time_left = ms_time % 1000;
+  constexpr int64_t MILLISECONDS_PER_SECOND = 1000;
+  time_t in_time_t = ms_time / MILLISECONDS_PER_SECOND;
+  auto ms_time_left = ms_time % MILLISECONDS_PER_SECOND;
 
   localtime_r(&in_time_t, &info);
-  strftime(time_str, 80, "%Y-%m-%d %H:%M:%S", &info);
+  strftime(time_str, TIME_STR_LEN, "%Y-%m-%d %H:%M:%S", &info);
 
   _os << time_str << '.' << std::setfill('0') << std::setw(3) << ms_time_left << " " << _level_str << nd::Worker::GetCurrWorkerName() << "(" << _file << ":"
       << _lineno << ") ";
@@ -84,19 +86,19 @@ class FileLogger {
 };
 
 #define g_file_logger (nd::Singleton<FileLogger, 0>::Instance())
-#define FILE_LOG(level, to_err, msg)                                                         \
+#define FILE_LOG(level, to_err, msg)                                                        \
   {                                                                                         \
     if (level >= g_log_level) {                                                             \
       const char* filename = __FILE_NAME__;                                                 \
       std::lock_guard<std::mutex> lock(g_file_logger->Mutex());                             \
       g_file_logger->stream(g_loglevel_str[level], filename, __LINE__) << msg << std::endl; \
-      if (to_err) {                                                                          \
+      if (to_err) {                                                                         \
         std::cerr << msg << std::endl;                                                      \
       }                                                                                     \
     }                                                                                       \
   }
 
-#define STD_LOG(level, to_err, msg)                                                               \
+#define STD_LOG(level, to_err, msg)                                                              \
   {                                                                                              \
     if (level >= g_log_level) {                                                                  \
       const char* filename = __FILE_NAME__;                                                      \

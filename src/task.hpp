@@ -34,7 +34,7 @@ std::atomic<size_t> ID<T>::s_id = 0;
 class CoroutineController {
  public:
   CoroutineController(std::coroutine_handle<> _coroutine) : m_coroutine(_coroutine) {}
-  ~CoroutineController() {
+  virtual ~CoroutineController() {
     if (m_coroutine) {
       m_coroutine.destroy();
       m_coroutine = nullptr;

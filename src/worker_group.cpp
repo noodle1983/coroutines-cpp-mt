@@ -53,14 +53,14 @@ void WorkerGroup::WaitStop() {
     return;
   }
 
-  unsigned int i = 0;
+  unsigned int thread_index = 0;
   while (true) {
     /* check the worker once only */
-    if (i < m_thread_count && m_workers[i].IsJobQueueEmpty()) {
-      m_workers[i].WaitStop();
-      i++;
+    if (thread_index < m_thread_count && m_workers[thread_index].IsJobQueueEmpty()) {
+      m_workers[thread_index].WaitStop();
+      thread_index++;
     }
-    if (i == m_thread_count) {
+    if (thread_index == m_thread_count) {
       break;
     }
 

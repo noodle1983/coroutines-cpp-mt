@@ -10,8 +10,8 @@ CheckOptions:
   - { key: readability-identifier-length.IgnoredVariableNames, value:  '' }
   - { key: readability-identifier-length.MinimumExceptionNameLength, value:  '2' }
   - { key: readability-identifier-length.MinimumLoopCounterNameLength, value:  '2' }
-  - { key: readability-identifier-length.MinimumParameterNameLength, value:  '3' }
-  - { key: readability-identifier-length.MinimumVariableNameLength, value:  '3' }
+  - { key: readability-identifier-length.MinimumParameterNameLength, value:  '2' }
+  - { key: readability-identifier-length.MinimumVariableNameLength, value:  '2' }
   - { key: readability-identifier-naming.AggressiveDependentMemberLookup, value:  'false' }
   - { key: readability-identifier-naming.CheckAnonFieldInParent, value:  'false' }
   - { key: readability-identifier-naming.ClassCase, value:  CamelCase }
@@ -24,10 +24,10 @@ CheckOptions:
   - { key: readability-identifier-naming.ClassMemberSuffix, value:  '' }
   - { key: readability-identifier-naming.ClassPrefix, value:  '' }
   - { key: readability-identifier-naming.ClassSuffix, value:  '' }
-  - { key: readability-identifier-naming.ConstexprVariableCase, value:  lower_case }
-
+  
+  - { key: readability-identifier-naming.ConstexprVariableCase, value:  UPPER_CASE }
   - { key: readability-identifier-naming.ConstexprVariableIgnoredRegexp, value:  '' }
-  - { key: readability-identifier-naming.ConstexprVariablePrefix, value:  g }
+  - { key: readability-identifier-naming.ConstexprVariablePrefix, value:  '' }
   - { key: readability-identifier-naming.ConstexprVariableSuffix, value:  '' }
   - { key: readability-identifier-naming.EnumCase, value:  CamelCase }
   - { key: readability-identifier-naming.EnumConstantCase, value:  CamelCase }
@@ -45,8 +45,8 @@ CheckOptions:
   - { key: readability-identifier-naming.FunctionPrefix, value:  '' }
   - { key: readability-identifier-naming.FunctionSuffix, value:  '' }
   - { key: readability-identifier-naming.GetConfigPerFile, value:  'true' }
+  
   - { key: readability-identifier-naming.GlobalConstantCase, value:  lower_case }
-
   - { key: readability-identifier-naming.GlobalConstantIgnoredRegexp, value:  '' }
   - { key: readability-identifier-naming.GlobalConstantPrefix, value:  'g_' }
   - { key: readability-identifier-naming.GlobalConstantSuffix, value:  '' }

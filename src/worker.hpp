@@ -13,6 +13,9 @@
 #include <worker_types.hpp>
 
 namespace nd {
+
+constexpr size_t MAX_WORKER_NAME_LEN = 32;
+
 class Worker {
  public:
   Worker();
@@ -82,7 +85,7 @@ class Worker {
   thread_local static std::thread::id s_current_thread_id;
   thread_local static int s_current_worker_group_id;
   thread_local static int s_current_worker_id;
-  thread_local static char s_worker_name[32];
+  thread_local static char s_worker_name[MAX_WORKER_NAME_LEN];
 
   int m_worker_group_id;
   int m_worker_id;
