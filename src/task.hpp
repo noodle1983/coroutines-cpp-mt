@@ -3,6 +3,7 @@
 #include <iostream>
 #include <list>
 #include <tuple>
+#include <type_traits>
 
 #include "log.hpp"
 #include "worker_manager.hpp"
@@ -16,6 +17,8 @@
 
 namespace nd {
 struct Empty {};
+template <bool exists, class T>
+using Maybe = std::conditional_t<exists, T, Empty>;
 
 template <typename ReturnType>
 class BaseTask;
@@ -45,6 +48,8 @@ std::atomic<size_t> ID<T>::s_id = 0;
 template <typename ReturnType = void>
 class CoroutineController {
 public:
+    using WaitingTask = std::tuple<BaseTask<ReturnType>*, Worker*>;
+
     CoroutineController(std::coroutine_handle<> _coroutine) : m_coroutine(_coroutine) { LOG_TRACE("controller-" << m_id << " created"); }
     virtual ~CoroutineController() {
         if (m_coroutine) {
@@ -67,17 +72,24 @@ public:
         return m_coroutine == nullptr;
     }
 
-    virtual void SaveResult() {};
+    // template<typename= typename enable_if_t<!std::is_void_v<ReturnType>>>
+    template <typename CheckType = ReturnType>
+    void SaveResult(typename std::enable_if_t<std::is_void_v<CheckType>, ReturnType>& _value) {
+        m_result = _value;
+    };
 
 private:
-    ID<CoroutineController> m_id;
+    ID<CoroutineController<ReturnType>> m_id;
 
-    using WaitingTask = std::tuple<BaseTask<ReturnType>*, Worker*>;
     std::list<WaitingTask> m_waiting_tasks;
     std::mutex m_waiting_tasks_mutex;
 
     std::coroutine_handle<> m_coroutine;
+
+    NO_UNIQUE_ADDRESS Maybe<!std::is_void_v<ReturnType>, ReturnType> m_result;
 };
+
+static_assert(sizeof(CoroutineController<void>) != sizeof(CoroutineController<char>));
 
 template <typename ReturnType = void>
 class BaseTask {
@@ -139,9 +151,7 @@ protected:
 };
 
 //-----------------------------------------
-// no result, no except
-//-----------------------------------------
-template <typename ReturnType = void>
+template <typename ReturnType>
 class TaskPromise {
 public:
     friend class Task<ReturnType>;
@@ -169,6 +179,52 @@ public:
 
     // NOLINTNEXTLINE
     Task<ReturnType> get_return_object() noexcept;
+
+    // NOLINTNEXTLINE
+    void return_value(ReturnType& _value) noexcept {
+        LOG_TRACE("promise-" << m_id << " return value");
+        m_controller->SaveResult(_value);
+        m_controller->OnCoroutineReturn();
+    }
+
+    // NOLINTNEXTLINE
+    void unhandled_exception() noexcept { LOG_TRACE("promise-" << m_id << " unhandled exception"); }
+
+private:
+    CorotineControllerSharedPtr m_controller;
+    ID<TaskPromise> m_id;
+};
+
+// It is illegal to have both return_value and return_void in a promise type, even if one of them is removed by SFINAE
+// https://devblogs.microsoft.com/oldnewthing/20210330-00/?p=105019
+template <>
+class TaskPromise<void> {
+public:
+    friend class Task<void>;
+    using CorotineControllerSharedPtr = std::shared_ptr<CoroutineController<void>>;
+
+    TaskPromise() noexcept {
+        LOG_TRACE("promise-" << m_id << " created");
+
+        m_controller = std::make_shared<CoroutineController<void>>(std::coroutine_handle<TaskPromise>::from_promise(*this));
+    }
+    virtual ~TaskPromise() { LOG_TRACE("promise-" << m_id << " destroyed"); }
+
+    // NOLINTNEXTLINE
+    auto initial_suspend() noexcept {
+        LOG_TRACE("promise-" << m_id << " inital_suspend");
+        return std::suspend_always{};
+    }
+
+    // NOLINTNEXTLINE
+    auto final_suspend() noexcept {
+        LOG_TRACE("promise-" << m_id << " final_suspend");
+        m_controller->OnCoroutineDone();
+        return std::suspend_never{};
+    }
+
+    // NOLINTNEXTLINE
+    Task<void> get_return_object() noexcept;
 
     // NOLINTNEXTLINE
     void return_void() noexcept {
@@ -241,18 +297,14 @@ void CoroutineController<ReturnType>::AddWaitingTask(BaseTask<ReturnType>* _task
 
 template <typename ReturnType>
 void CoroutineController<ReturnType>::OnCoroutineReturn() {
-    SaveResult();
-
-    {
-        // task is waited in other coroutine, so it ought to be exist
-        std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
-        for (auto& waiting_task : m_waiting_tasks) {
-            auto* task = std::get<0>(waiting_task);
-            auto* worker = std::get<1>(waiting_task);
-            worker->AddJob(new nd::Job{[task]() { task->OnCoroutineReturn(); }});
-        }
-        m_waiting_tasks.clear();
+    // task is waited in other coroutine, so it ought to be exist
+    std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
+    for (auto& waiting_task : m_waiting_tasks) {
+        auto* task = std::get<0>(waiting_task);
+        auto* worker = std::get<1>(waiting_task);
+        worker->AddJob(new nd::Job{[task]() { task->OnCoroutineReturn(); }});
     }
+    m_waiting_tasks.clear();
 }
 
 template <typename ReturnType>
@@ -268,5 +320,10 @@ template <typename ReturnType>
 Task<ReturnType> TaskPromise<ReturnType>::get_return_object() noexcept {
     LOG_TRACE("promise-" << m_id << " get_return_object");
     return Task<ReturnType>{m_controller};
+}
+
+inline Task<void> TaskPromise<void>::get_return_object() noexcept {
+    LOG_TRACE("promise-" << m_id << " get_return_object");
+    return Task<void>{m_controller};
 }
 }  // namespace nd

@@ -1,3 +1,5 @@
+#include <cstddef>
+
 #include "gtest/gtest.h"
 #include "log.hpp"
 #include "task.hpp"
@@ -33,6 +35,25 @@ protected:
     void SetUp() override {}
     void TearDown() override {}
 };
+
+TEST_F(CoroutinesCppMtTest, TypeSize) {
+    LOG_TRACE("----------------------------------------");
+    LOG_TRACE("sizeof nd::CoroutineController<void> = " << sizeof(nd::CoroutineController<void>));
+    LOG_TRACE("\tsizeof nd::ID<CoroutineController<void>> = " << sizeof(nd::ID<nd::CoroutineController<void>>));
+    LOG_TRACE("\tsizeof std::list<CoroutineController<void>::WaitingTask> = " << sizeof(std::list<nd::CoroutineController<void>::WaitingTask>));
+    LOG_TRACE("\tsizeof std::mutex = " << sizeof(std::mutex));
+    LOG_TRACE("\tsizeof std::coroutine_handle<> = " << sizeof(std::coroutine_handle<>));
+    LOG_TRACE("----------------------------------------");
+    LOG_TRACE("sizeof nd::CoroutineController<char> = " << sizeof(nd::CoroutineController<char>));
+    LOG_TRACE("\tsizeof nd::ID<CoroutineController<char>> = " << sizeof(nd::ID<nd::CoroutineController<char>>));
+    LOG_TRACE("\tsizeof std::list<CoroutineController<char>::WaitingTask> = " << sizeof(std::list<nd::CoroutineController<char>::WaitingTask>));
+    LOG_TRACE("\tsizeof std::mutex = " << sizeof(std::mutex));
+    LOG_TRACE("\tsizeof std::coroutine_handle<> = " << sizeof(std::coroutine_handle<>));
+    LOG_TRACE("\tsizeof char = " << sizeof(char));
+    LOG_TRACE("----------------------------------------");
+    EXPECT_EQ(sizeof(nd::CoroutineController<void>) + sizeof(size_t), sizeof(nd::CoroutineController<char>));
+    EXPECT_EQ(sizeof(nd::CoroutineController<void>) + sizeof(size_t), sizeof(nd::CoroutineController<size_t>));
+}
 
 TEST_F(CoroutinesCppMtTest, Wait_Bg_Task_On_Main_Thread) {
     auto main_task = []() -> nd::Task<> {
@@ -111,7 +132,5 @@ TEST_F(CoroutinesCppMtTest, Run_Multi_Task_On_Same_Thread) {
     main_task.WaitInMain();
     nd::Worker::GetMainWorker()->WaitUntilEmpty();
 }
-
-TEST_F(CoroutinesCppMtTest, 17_DivideBy_19) {}
 
 TEST_F(CoroutinesCppMtTest, Long_DivideBy_Long) {}
