@@ -37,7 +37,7 @@ namespace nd {
 
 	struct min_heap_item_t {
 		/* for managing timeouts */
-		int min_heap_idx;
+		int min_heap_idx = -1;
 		CppTimePoint timeout;
 		TimerCallback callback;
 	};

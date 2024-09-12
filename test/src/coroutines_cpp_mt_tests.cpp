@@ -7,6 +7,7 @@
 using namespace std;
 
 // usage 1 : define worker group(thread model)
+// NOLINTNEXTLINE
 namespace WorkerGroup {
 enum {
     BG1 = 0,
@@ -34,78 +35,80 @@ protected:
 };
 
 TEST_F(CoroutinesCppMtTest, Wait_Bg_Task_On_Main_Thread) {
-    auto mainTask = []() -> nd::Task {
+    auto main_task = []() -> nd::Task<> {
         LOG_TRACE("-> main task in worker" << nd::Worker::GetCurrWorkerName());
         LOG_TRACE("----------------------------------------");
 
-        co_await []() -> nd::Task {
+        co_await []() -> nd::Task<> {
             LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
-            co_await nd::TimeWaiter(1000);
+            co_await nd::TimeWaiter(1000);  // NOLINT
             LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 1 sec later");
             co_return;
         }()
-                             .RunOnProcessor(WorkerGroup::BG1);
+                             .RunOnProcessor(WorkerGroup::BG1);  // NOLINT, clang-format insists on this indent...
 
         LOG_TRACE("----------------------------------------");
 
-        co_await []() -> nd::Task {
+        co_await []() -> nd::Task<> {
             LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
-            co_await nd::TimeWaiter(2000);
+            co_await nd::TimeWaiter(2000);  // NOLINT
             LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 2 secs later");
             co_return;
         }()
-                             .RunOnProcessor(WorkerGroup::BG2);
+                             .RunOnProcessor(WorkerGroup::BG2);  // NOLINT
 
         LOG_TRACE("----------------------------------------");
 
         // you should see the destruction log of upper promise and task
-        // main's resume is called in the BG1 thread, it can be run before the destruction of upper promise and task.
-        // so wait for a while to see the log
-        co_await nd::TimeWaiter(1);
+        // main's resume is called in the BG1 thread, it can be run before the
+        // destruction of upper promise and task. so wait for a while to see the log
+        co_await nd::TimeWaiter(1);  // NOLINT
 
         LOG_TRACE("<- main task in worker" << nd::Worker::GetCurrWorkerName());
     }();
 
-    mainTask.RunOnProcessor();  // run on current worker, which is main worker on the marked main thread.
-    mainTask.WaitInMain();
+    main_task.RunOnProcessor();  // run on current worker, which is main worker on
+                                 // the marked main thread.
+    main_task.WaitInMain();
     nd::Worker::GetMainWorker()->WaitUntilEmpty();
 }
 
 TEST_F(CoroutinesCppMtTest, Run_Multi_Task_On_Same_Thread) {
-    auto mainTask = []() -> nd::Task {
+    auto main_task = []() -> nd::Task<> {
         LOG_TRACE("-> main task in worker" << nd::Worker::GetCurrWorkerName());
         LOG_TRACE("----------------------------------------");
 
-        auto bgTask1 = []() -> nd::Task {
+        auto bg_task1 = []() -> nd::Task<> {
             LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
-            co_await nd::TimeWaiter(1500);
+            co_await nd::TimeWaiter(1500);  // NOLINT
             LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 1.5 sec later");
             co_return;
         }();
-        bgTask1.RunOnProcessor(WorkerGroup::BG1);
+        bg_task1.RunOnProcessor(WorkerGroup::BG1);
 
-        auto bgTask2 = []() -> nd::Task {
+        auto bg_task2 = []() -> nd::Task<> {
             LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
-            co_await nd::TimeWaiter(1000);
+            co_await nd::TimeWaiter(1000);  // NOLINT
             FLOG_TRACE("<- bg task in worker %s after 1 sec later", nd::Worker::GetCurrWorkerName());
             co_return;
         }();
-        bgTask2.RunOnProcessor(WorkerGroup::BG1);
+        bg_task2.RunOnProcessor(WorkerGroup::BG1);
 
-        co_await bgTask1;
-        co_await bgTask2;
+        co_await bg_task1;
+        co_await bg_task2;
 
         FLOG_TRACE("----------------------------------------");
         // you should see the destruction log of upper promise and task
-        // main's resume is called in the BG1 thread, it can be run before the destruction of upper promise and task.
-        // so wait for a while to see the log
-        co_await nd::TimeWaiter(1);
+        // main's resume is called in the BG1 thread, it can be run before the
+        // destruction of upper promise and task. so wait for a while to see the log
+        co_await nd::TimeWaiter(1);  // NOLINT
 
         FLOG_TRACE("<- main task in worker %s", nd::Worker::GetCurrWorkerName());
     }();
 
-    mainTask.RunOnProcessor();  // run on current worker, which is main worker on the marked main thread.
-    mainTask.WaitInMain();
+    main_task.RunOnProcessor();  // run on current worker, which is main worker on
+                                 // the marked main thread.
+    main_task.WaitInMain();
     nd::Worker::GetMainWorker()->WaitUntilEmpty();
 }
 
