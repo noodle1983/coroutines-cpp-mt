@@ -154,8 +154,8 @@ private:
 
 #define FLOG_TRACE(fmt, ...) FMT_LOG(printf, ((int)LogLevel::TRACE), false, fmt, ##__VA_ARGS__)
 #define FLOG_DEBUG(fmt, ...) FMT_LOG(printf, ((int)LogLevel::DEBUG), false, fmt, ##__VA_ARGS__)
-#define FLOG_INFO (fmt, ...) FMT_LOG(printf, ((int)LogLevel::INFO), false, fmt, ##__VA_ARGS__)
-#define FLOG_WARN (fmt, ...) FMT_LOG(printf, ((int)LogLevel::WARN), false, fmt, ##__VA_ARGS__)
+#define FLOG_INFO(fmt, ...) FMT_LOG(printf, ((int)LogLevel::INFO), false, fmt, ##__VA_ARGS__)
+#define FLOG_WARN(fmt, ...) FMT_LOG(printf, ((int)LogLevel::WARN), false, fmt, ##__VA_ARGS__)
 #define FLOG_ERROR(fmt, ...) FMT_LOG(printf, ((int)LogLevel::ERROR), true, fmt, ##__VA_ARGS__)
 #define FLOG_FATAL(fmt, ...) FMT_LOG(printf, ((int)LogLevel::FATAL), true, fmt, ##__VA_ARGS__)
 
