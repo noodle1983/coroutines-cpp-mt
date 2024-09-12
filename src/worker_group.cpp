@@ -16,79 +16,79 @@ WorkerGroup::WorkerGroup(unsigned _group_id, const unsigned _thread_count, const
 //-----------------------------------------------------------------------------
 
 WorkerGroup::~WorkerGroup() {
-  if (m_workers != nullptr) {
-    if (m_wait_stop) {
-      WaitStop();
-    } else {
-      Stop();
+    if (m_workers != nullptr) {
+        if (m_wait_stop) {
+            WaitStop();
+        } else {
+            Stop();
+        }
     }
-  }
 }
 
 //-----------------------------------------------------------------------------
 
 void WorkerGroup::Start(bool _to_wait_stop) {
-  m_wait_stop = _to_wait_stop;
-  if (0 == m_thread_count) {
-    return;
-  }
+    m_wait_stop = _to_wait_stop;
+    if (0 == m_thread_count) {
+        return;
+    }
 
-  if (NULL != m_workers) {
-    return;
-  }
+    if (NULL != m_workers) {
+        return;
+    }
 
-  m_workers = new Worker[m_thread_count];
-  m_threads.reserve(m_thread_count);
-  for (unsigned i = 0; i < m_thread_count; i++) {
-    m_workers[i].Init(m_group_id, i, m_thread_count, m_name);
-    m_threads.push_back(thread(&Worker::ThreadMain, &m_workers[i]));
-  }
+    m_workers = new Worker[m_thread_count];
+    m_threads.reserve(m_thread_count);
+    for (unsigned i = 0; i < m_thread_count; i++) {
+        m_workers[i].Init(m_group_id, i, m_thread_count, m_name);
+        m_threads.push_back(thread(&Worker::ThreadMain, &m_workers[i]));
+    }
 }
 
 //-----------------------------------------------------------------------------
 
 void WorkerGroup::WaitStop() {
-  lock_guard<mutex> lock(m_stop_mutex);
-  if (NULL == m_workers) {
-    return;
-  }
-
-  unsigned int thread_index = 0;
-  while (true) {
-    /* check the worker once only */
-    if (thread_index < m_thread_count && m_workers[thread_index].IsJobQueueEmpty()) {
-      m_workers[thread_index].WaitStop();
-      thread_index++;
-    }
-    if (thread_index == m_thread_count) {
-      break;
+    lock_guard<mutex> lock(m_stop_mutex);
+    if (NULL == m_workers) {
+        return;
     }
 
-    this_thread::sleep_for(chrono::milliseconds(1));
-  }
-  for (unsigned i = 0; i < m_thread_count; i++) {
-    m_threads[i].join();
-  }
-  delete[] m_workers;
-  m_workers = NULL;
+    unsigned int thread_index = 0;
+    while (true) {
+        /* check the worker once only */
+        if (thread_index < m_thread_count && m_workers[thread_index].IsJobQueueEmpty()) {
+            m_workers[thread_index].WaitStop();
+            thread_index++;
+        }
+        if (thread_index == m_thread_count) {
+            break;
+        }
+
+        this_thread::sleep_for(chrono::milliseconds(1));
+    }
+    for (unsigned i = 0; i < m_thread_count; i++) {
+        m_threads[i].join();
+    }
+    delete[] m_workers;
+    m_workers = NULL;
 }
 
 //-----------------------------------------------------------------------------
 
 void WorkerGroup::Stop() {
-  lock_guard<mutex> lock(m_stop_mutex);
-  if (NULL == m_workers) {
-    return;
-  }
+    lock_guard<mutex> lock(m_stop_mutex);
+    if (NULL == m_workers) {
+        return;
+    }
 
-  for (unsigned i = 0; i < m_thread_count; i++) {
-    m_workers[i].Stop();
-  }
-  for (unsigned i = 0; i < m_thread_count; i++) {
-    m_threads[i].join();
-  }
-  delete[] m_workers;
-  m_workers = NULL;
+    for (unsigned i = 0; i < m_thread_count; i++) {
+        m_workers[i].Stop();
+    }
+    for (unsigned i = 0; i < m_thread_count; i++) {
+        m_threads[i].join();
+    }
+    delete[] m_workers;
+    m_workers = NULL;
 }
 
 //-----------------------------------------------------------------------------

@@ -24,18 +24,18 @@
 // https://stackoverflow.com/a/54335644
 template <typename T, size_t S>
 inline constexpr size_t get_file_name_offset(const T (&str)[S], size_t i = S - 1) {
-  return (str[i] == '/' || str[i] == '\\') ? i + 1 : (i > 0 ? get_file_name_offset(str, i - 1) : 0);
+    return (str[i] == '/' || str[i] == '\\') ? i + 1 : (i > 0 ? get_file_name_offset(str, i - 1) : 0);
 }
 
 template <typename T>
 inline constexpr size_t get_file_name_offset(T (&str)[1]) {
-  return 0;
+    return 0;
 }
 
 namespace utility {
 template <typename T, T v>
 struct const_expr_value {
-  static constexpr const T value = v;
+    static constexpr const T value = v;
 };
 }  // namespace utility
 
@@ -51,61 +51,61 @@ const char* const g_loglevel_str[] = {"TRACE ", "DEBUG ", "INFO  ", "WARN  ", "E
 
 template <typename StreamType>
 StreamType& FormatLogPrefix(StreamType& _os, const char* _level_str, const char* _file, const unsigned _lineno) {
-  struct tm info;
-  constexpr size_t TIME_STR_LEN = 80;
-  char time_str[TIME_STR_LEN];
+    struct tm info;
+    constexpr size_t TIME_STR_LEN = 80;
+    char time_str[TIME_STR_LEN];
 
-  using namespace std::chrono;
-  auto now = system_clock::now();
-  auto ms_time = duration_cast<milliseconds>(now.time_since_epoch()).count();
-  constexpr int64_t MILLISECONDS_PER_SECOND = 1000;
-  time_t in_time_t = ms_time / MILLISECONDS_PER_SECOND;
-  auto ms_time_left = ms_time % MILLISECONDS_PER_SECOND;
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    auto ms_time = duration_cast<milliseconds>(now.time_since_epoch()).count();
+    constexpr int64_t MILLISECONDS_PER_SECOND = 1000;
+    time_t in_time_t = ms_time / MILLISECONDS_PER_SECOND;
+    auto ms_time_left = ms_time % MILLISECONDS_PER_SECOND;
 
-  localtime_r(&in_time_t, &info);
-  strftime(time_str, TIME_STR_LEN, "%Y-%m-%d %H:%M:%S", &info);
+    localtime_r(&in_time_t, &info);
+    strftime(time_str, TIME_STR_LEN, "%Y-%m-%d %H:%M:%S", &info);
 
-  _os << time_str << '.' << std::setfill('0') << std::setw(3) << ms_time_left << " " << _level_str << nd::Worker::GetCurrWorkerName() << "(" << _file << ":"
-      << _lineno << ") ";
-  return _os;
+    _os << time_str << '.' << std::setfill('0') << std::setw(3) << ms_time_left << " " << _level_str << nd::Worker::GetCurrWorkerName() << "(" << _file << ":"
+        << _lineno << ") ";
+    return _os;
 }
 
 class FileLogger {
- public:
-  FileLogger() { m_out.open(g_log_filename); }
+public:
+    FileLogger() { m_out.open(g_log_filename); }
 
-  std::ofstream& Stream(const char* _level_str, const char* _file, const unsigned _lineno) { return FormatLogPrefix(m_out, _level_str, _file, _lineno); }
+    std::ofstream& Stream(const char* _level_str, const char* _file, const unsigned _lineno) { return FormatLogPrefix(m_out, _level_str, _file, _lineno); }
 
-  std::mutex& Mutex() { return m_mutex; }
+    std::mutex& Mutex() { return m_mutex; }
 
-  virtual ~FileLogger() { m_out.flush(); }
+    virtual ~FileLogger() { m_out.flush(); }
 
- private:
-  std::ofstream m_out;
-  std::mutex m_mutex;
+private:
+    std::ofstream m_out;
+    std::mutex m_mutex;
 };
 
 #define g_file_logger (nd::Singleton<FileLogger, 0>::Instance())
-#define FILE_LOG(level, to_err, msg)                                                        \
-  {                                                                                         \
-    if (level >= g_log_level) {                                                             \
-      const char* filename = __FILE_NAME__;                                                 \
-      std::lock_guard<std::mutex> lock(g_file_logger->Mutex());                             \
-      g_file_logger->stream(g_loglevel_str[level], filename, __LINE__) << msg << std::endl; \
-      if (to_err) {                                                                         \
-        std::cerr << msg << std::endl;                                                      \
-      }                                                                                     \
-    }                                                                                       \
-  }
+#define FILE_LOG(level, to_err, msg)                                                              \
+    {                                                                                             \
+        if (level >= g_log_level) {                                                               \
+            const char* filename = __FILE_NAME__;                                                 \
+            std::lock_guard<std::mutex> lock(g_file_logger->Mutex());                             \
+            g_file_logger->stream(g_loglevel_str[level], filename, __LINE__) << msg << std::endl; \
+            if (to_err) {                                                                         \
+                std::cerr << msg << std::endl;                                                    \
+            }                                                                                     \
+        }                                                                                         \
+    }
 
-#define STD_LOG(level, to_err, msg)                                                              \
-  {                                                                                              \
-    if (level >= g_log_level) {                                                                  \
-      const char* filename = __FILE_NAME__;                                                      \
-      std::lock_guard<std::mutex> lock(g_file_logger->Mutex());                                  \
-      FormatLogPrefix(std::cout, g_loglevel_str[level], filename, __LINE__) << msg << std::endl; \
-    }                                                                                            \
-  }
+#define STD_LOG(level, to_err, msg)                                                                    \
+    {                                                                                                  \
+        if (level >= g_log_level) {                                                                    \
+            const char* filename = __FILE_NAME__;                                                      \
+            std::lock_guard<std::mutex> lock(g_file_logger->Mutex());                                  \
+            FormatLogPrefix(std::cout, g_loglevel_str[level], filename, __LINE__) << msg << std::endl; \
+        }                                                                                              \
+    }
 
 // log relate
 #define LOG_TRACE(msg) STD_LOG(((int)LogLevel::TRACE), false, msg)
