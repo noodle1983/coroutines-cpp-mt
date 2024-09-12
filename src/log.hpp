@@ -1,6 +1,12 @@
 #ifndef LOG_H
 #define LOG_H
 
+/********************
+ * synchronized log for test purpose,
+ * LOG_XXXX for ostream style
+ * FLOG_XXXX for printf style
+ **/
+
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -15,6 +21,8 @@
 
 #include "singleton.hpp"
 #include "worker.hpp"
+
+constexpr int64_t MILLISECONDS_PER_SECOND = 1000;
 
 #if WIN32
 #define localtime_r(a, b) localtime_s((b), (a))
@@ -58,7 +66,6 @@ StreamType& FormatLogPrefix(StreamType& _os, const char* _level_str, const char*
     using namespace std::chrono;
     auto now = system_clock::now();
     auto ms_time = duration_cast<milliseconds>(now.time_since_epoch()).count();
-    constexpr int64_t MILLISECONDS_PER_SECOND = 1000;
     time_t in_time_t = ms_time / MILLISECONDS_PER_SECOND;
     auto ms_time_left = ms_time % MILLISECONDS_PER_SECOND;
 
@@ -77,6 +84,18 @@ public:
     std::ofstream& Stream(const char* _level_str, const char* _file, const unsigned _lineno) { return FormatLogPrefix(m_out, _level_str, _file, _lineno); }
 
     std::mutex& Mutex() { return m_mutex; }
+
+    // no lock guard, caller should lock the mutex before calling this function
+    void Printf(const char* _fmt, ...) {
+        constexpr size_t MAX_LOG_LEN = 1024;
+        char log_buf[MAX_LOG_LEN];
+        va_list args;
+        va_start(args, _fmt);
+        vsnprintf(log_buf, MAX_LOG_LEN - 1, _fmt, args);
+        va_end(args);
+
+        m_out << log_buf;
+    }
 
     virtual ~FileLogger() { m_out.flush(); }
 
@@ -107,6 +126,24 @@ private:
         }                                                                                              \
     }
 
+#define FMT_LOG(pfunc, level, to_err, fmt, ...)                                                                                                              \
+    {                                                                                                                                                        \
+        if (level >= g_log_level) {                                                                                                                          \
+            struct tm info;                                                                                                                                  \
+            const char* filename = __FILE_NAME__;                                                                                                            \
+            using namespace std::chrono;                                                                                                                     \
+            auto now = system_clock::now();                                                                                                                  \
+            auto ms_time = duration_cast<milliseconds>(now.time_since_epoch()).count();                                                                      \
+            time_t in_time_t = ms_time / MILLISECONDS_PER_SECOND;                                                                                            \
+            int ms_time_left = (int)(ms_time % MILLISECONDS_PER_SECOND);                                                                                     \
+                                                                                                                                                             \
+            localtime_r(&in_time_t, &info);                                                                                                                  \
+            std::lock_guard<std::mutex> lock(g_file_logger->Mutex());                                                                                        \
+            pfunc("%04d-%02d-%02d %02d:%02d:%02d.%03d %s%s(%s:%d) " fmt "\n", info.tm_year + 1900, info.tm_mon + 1, info.tm_mday, info.tm_hour, info.tm_min, \
+                  info.tm_sec, ms_time_left, g_loglevel_str[level], nd::Worker::GetCurrWorkerName(), filename, __LINE__, ##__VA_ARGS__);                     \
+        }                                                                                                                                                    \
+    }
+
 // log relate
 #define LOG_TRACE(msg) STD_LOG(((int)LogLevel::TRACE), false, msg)
 #define LOG_DEBUG(msg) STD_LOG(((int)LogLevel::DEBUG), false, msg)
@@ -114,5 +151,12 @@ private:
 #define LOG_WARN (msg) STD_LOG(((int)LogLevel::WARN), false, msg)
 #define LOG_ERROR(msg) STD_LOG(((int)LogLevel::ERROR), true, msg)
 #define LOG_FATAL(msg) STD_LOG(((int)LogLevel::FATAL), true, msg)
+
+#define FLOG_TRACE(fmt, ...) FMT_LOG(printf, ((int)LogLevel::TRACE), false, fmt, ##__VA_ARGS__)
+#define FLOG_DEBUG(fmt, ...) FMT_LOG(printf, ((int)LogLevel::DEBUG), false, fmt, ##__VA_ARGS__)
+#define FLOG_INFO (fmt, ...) FMT_LOG(printf, ((int)LogLevel::INFO), false, fmt, ##__VA_ARGS__)
+#define FLOG_WARN (fmt, ...) FMT_LOG(printf, ((int)LogLevel::WARN), false, fmt, ##__VA_ARGS__)
+#define FLOG_ERROR(fmt, ...) FMT_LOG(printf, ((int)LogLevel::ERROR), true, fmt, ##__VA_ARGS__)
+#define FLOG_FATAL(fmt, ...) FMT_LOG(printf, ((int)LogLevel::FATAL), true, fmt, ##__VA_ARGS__)
 
 #endif
