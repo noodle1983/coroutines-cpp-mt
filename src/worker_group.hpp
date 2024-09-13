@@ -29,9 +29,7 @@ public:
     void Stop();
 
     Worker* GetWorker(const size_t _session_id) {
-        if (NULL == m_workers) {
-            return NULL;
-        }
+        if (NULL == m_workers) { return NULL; }
         unsigned worker_id = _session_id % m_thread_count;
         return &m_workers[worker_id];
     }
@@ -60,7 +58,8 @@ private:
 // }
 
 // template<>
-// void process<(WorkerGroup)PreDefWorkerGroup::CurrentWorker>(SessionId theId, Job* job);
+// void process<(WorkerGroup)PreDefWorkerGroup::CurrentWorker>(SessionId theId, Job*
+// job);
 
 // template<>
 // void process<(WorkerGroup)PreDefWorkerGroup::Main>(SessionId theId, Job* job);

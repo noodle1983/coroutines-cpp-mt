@@ -35,9 +35,7 @@ public:
 
     void Stop(unsigned _worker_group_id) {
         assert(_worker_group_id < m_max_worker_group);
-        if (m_worker_groups[_worker_group_id] == nullptr) {
-            return;
-        }
+        if (m_worker_groups[_worker_group_id] == nullptr) { return; }
 
         m_worker_groups[_worker_group_id]->WaitStop();
         delete m_worker_groups[_worker_group_id];
@@ -45,17 +43,11 @@ public:
     }
 
     void StopAll() {
-        if (m_max_worker_group == 0) {
-            return;
-        }
-        if (m_worker_groups == nullptr) {
-            return;
-        }
+        if (m_max_worker_group == 0) { return; }
+        if (m_worker_groups == nullptr) { return; }
 
         for (unsigned i = 0; i < m_max_worker_group; ++i) {
-            if (m_worker_groups[i] == nullptr) {
-                continue;
-            }
+            if (m_worker_groups[i] == nullptr) { continue; }
 
             Stop(i);
         }
@@ -64,12 +56,8 @@ public:
     }
 
     Worker* GetWorker(unsigned _worker_group_id, size_t _session_id) {
-        if (_worker_group_id == PreDefWorkerGroup::Main) {
-            return Worker::GetMainWorker();
-        }
-        if (_worker_group_id == PreDefWorkerGroup::Current) {
-            return Worker::GetCurrentWorker();
-        }
+        if (_worker_group_id == PreDefWorkerGroup::Main) { return Worker::GetMainWorker(); }
+        if (_worker_group_id == PreDefWorkerGroup::Current) { return Worker::GetCurrentWorker(); }
 
         assert(0 <= _worker_group_id && _worker_group_id < m_max_worker_group);
         assert(m_worker_groups[_worker_group_id] != nullptr);
@@ -78,12 +66,8 @@ public:
     }
 
     void RunOnWorkerGroup(int _worker_group_id, size_t _session_id, Job* _job) {
-        if (_worker_group_id == PreDefWorkerGroup::Main) {
-            return RunOnMainThread(_job);
-        }
-        if (_worker_group_id == PreDefWorkerGroup::Current) {
-            return RunOnCurrentThread(_job);
-        }
+        if (_worker_group_id == PreDefWorkerGroup::Main) { return RunOnMainThread(_job); }
+        if (_worker_group_id == PreDefWorkerGroup::Current) { return RunOnCurrentThread(_job); }
 
         assert(0 <= _worker_group_id && _worker_group_id < m_max_worker_group);
         assert(m_worker_groups[_worker_group_id] != nullptr);

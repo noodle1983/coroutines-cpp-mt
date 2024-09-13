@@ -50,7 +50,9 @@ class CoroutineController {
 public:
     using WaitingTask = std::tuple<BaseTask<ReturnType>*, Worker*>;
 
-    CoroutineController(std::coroutine_handle<> _coroutine) : m_coroutine(_coroutine) { LOG_TRACE("controller-" << m_id << " created"); }
+    CoroutineController(std::coroutine_handle<> _coroutine) : m_coroutine(_coroutine) {
+        LOG_TRACE("controller-" << m_id << " created");
+    }
     virtual ~CoroutineController() {
         if (m_coroutine) {
             m_coroutine.destroy();
@@ -72,14 +74,21 @@ public:
         return m_coroutine == nullptr;
     }
 
-    // template<typename= typename enable_if_t<!std::is_void_v<ReturnType>>>
     template <typename CheckType = ReturnType>
-    void SaveResult(typename std::enable_if_t<std::is_void_v<CheckType>, ReturnType>& _value) {
+    void SaveResult(typename std::enable_if_t<!std::is_void_v<CheckType>, ReturnType>& _value) {
         m_result = _value;
+    };
+    template <typename CheckType = ReturnType>
+    void SaveResult(typename std::enable_if_t<!std::is_void_v<CheckType>, ReturnType>&& _value) {
+        m_result = _value;
+    };
+    template <typename CheckType = ReturnType>
+    typename std::enable_if_t<!std::is_void_v<CheckType>, const ReturnType>& GetResult() {
+        return m_result;
     };
 
 private:
-    ID<CoroutineController<ReturnType>> m_id;
+    ID<CoroutineController<Empty>> m_id;
 
     std::list<WaitingTask> m_waiting_tasks;
     std::mutex m_waiting_tasks_mutex;
@@ -101,9 +110,6 @@ public:
     virtual ~BaseTask() {}
 
     void BaseRunOnProcessor(int _worker_group_id = PreDefWorkerGroup::Current, const SessionId _the_id = 0) {
-        if (!m_controller) {
-            return;
-        }
         if (m_running_worker != nullptr) {
             // LOG_WARN("task can't run twice");
             return;
@@ -114,37 +120,25 @@ public:
     }
 
     void BaseResume() {
-        if (!m_controller) {
-            return;
-        }
-        if (m_running_worker == nullptr) {
-            return;
-        }
+        if (m_running_worker == nullptr) { return; }
 
         auto controller = m_controller;
         auto id = m_id.Id();
         m_running_worker->AddJob(new nd::Job{[controller, id]() {
-            if (!controller) {
-                return;
-            }
+            if (!controller) { return; }
             LOG_TRACE("task-" << id << " run in worker");
             controller->Handle().resume();
         }});
     }
 
-    void WaitReturn(Worker* _worker) {
-        if (!m_controller) {
-            return;
-        }
-        m_controller->AddWaitingTask(this, _worker);
-    }
+    void WaitReturn(Worker* _worker) { m_controller->AddWaitingTask(this, _worker); }
 
     virtual void OnCoroutineReturn() {}
 
-    bool IsDone() const { return m_controller == nullptr || m_controller->IsDone(); }
+    bool IsDone() const { return m_controller->IsDone(); }
 
 protected:
-    ID<BaseTask> m_id;
+    ID<BaseTask<Empty>> m_id;
 
     CorotineControllerSharedPtr m_controller;
     nd::Worker* m_running_worker;
@@ -160,7 +154,8 @@ public:
     TaskPromise() noexcept {
         LOG_TRACE("promise-" << m_id << " created");
 
-        m_controller = std::make_shared<CoroutineController<ReturnType>>(std::coroutine_handle<TaskPromise>::from_promise(*this));
+        m_controller =
+            std::make_shared<CoroutineController<ReturnType>>(std::coroutine_handle<TaskPromise>::from_promise(*this));
     }
     virtual ~TaskPromise() { LOG_TRACE("promise-" << m_id << " destroyed"); }
 
@@ -182,7 +177,14 @@ public:
 
     // NOLINTNEXTLINE
     void return_value(ReturnType& _value) noexcept {
-        LOG_TRACE("promise-" << m_id << " return value");
+        LOG_TRACE("promise-" << m_id << " return value&");
+        m_controller->SaveResult(_value);
+        m_controller->OnCoroutineReturn();
+    }
+
+    // NOLINTNEXTLINE
+    void return_value(ReturnType&& _value) noexcept {
+        LOG_TRACE("promise-" << m_id << " return value&&");
         m_controller->SaveResult(_value);
         m_controller->OnCoroutineReturn();
     }
@@ -192,10 +194,11 @@ public:
 
 private:
     CorotineControllerSharedPtr m_controller;
-    ID<TaskPromise> m_id;
+    ID<TaskPromise<Empty>> m_id;
 };
 
-// It is illegal to have both return_value and return_void in a promise type, even if one of them is removed by SFINAE
+// It is illegal to have both return_value and return_void in a promise type, even if
+// one of them is removed by SFINAE
 // https://devblogs.microsoft.com/oldnewthing/20210330-00/?p=105019
 template <>
 class TaskPromise<void> {
@@ -206,7 +209,8 @@ public:
     TaskPromise() noexcept {
         LOG_TRACE("promise-" << m_id << " created");
 
-        m_controller = std::make_shared<CoroutineController<void>>(std::coroutine_handle<TaskPromise>::from_promise(*this));
+        m_controller =
+            std::make_shared<CoroutineController<void>>(std::coroutine_handle<TaskPromise>::from_promise(*this));
     }
     virtual ~TaskPromise() { LOG_TRACE("promise-" << m_id << " destroyed"); }
 
@@ -237,7 +241,7 @@ public:
 
 private:
     CorotineControllerSharedPtr m_controller;
-    ID<TaskPromise> m_id;
+    ID<TaskPromise<Empty>> m_id;
 };
 
 template <typename ReturnType = void>
@@ -247,7 +251,9 @@ public:
     using CorotineControllerSharedPtr = std::shared_ptr<CoroutineController<ReturnType>>;
     using ParentTask = BaseTask<ReturnType>;
 
-    Task(CorotineControllerSharedPtr& _controller) : ParentTask(_controller) { LOG_TRACE("task-" << ParentTask::m_id << " created"); }
+    Task(CorotineControllerSharedPtr& _controller) : ParentTask(_controller) {
+        LOG_TRACE("task-" << ParentTask::m_id << " created");
+    }
     virtual ~Task() { LOG_TRACE("task-" << ParentTask::m_id << " destroyed"); }
 
     Task& RunOnProcessor(int _worker_group_id = PreDefWorkerGroup::Current, const SessionId _the_id = 0) {
@@ -267,14 +273,20 @@ public:
 
         m_parent_coroutine_controller.resume();
     }
-    // NOLINTNEXTLINE
-    void await_resume() const noexcept {}
+
+    template <typename CheckType = ReturnType>  // NOLINTNEXTLINE
+    typename std::enable_if_t<std::is_void_v<CheckType>, void> await_resume() const noexcept {
+        LOG_TRACE("task-" << ParentTask::m_id << " return void");
+    }
+
+    template <typename CheckType = ReturnType>  // NOLINTNEXTLINE
+    typename std::enable_if_t<!std::is_void_v<CheckType>, CheckType> await_resume() const noexcept {
+        return ParentTask::m_controller->GetResult();
+    }
 
     // wait for the task to complete in main thread
     void WaitInMain() {
-        while (!ParentTask::IsDone()) {
-            Worker::GetCurrentWorker()->Step();
-        }
+        while (!ParentTask::IsDone()) { Worker::GetCurrentWorker()->Step(); }
     }
 
 private:

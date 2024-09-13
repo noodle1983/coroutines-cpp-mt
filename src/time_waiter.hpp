@@ -15,20 +15,14 @@ public:
 
     TimeWaiter& Reset(uint64_t _time = 0) {
         assert(!m_coroutine);
-        if (m_timer_handle != nullptr) {
-            Worker::GetCurrentWorker()->CancelLocalTimer(m_timer_handle);
-        }
-        if (_time > 0) {
-            m_mstime = _time;
-        }
+        if (m_timer_handle != nullptr) { Worker::GetCurrentWorker()->CancelLocalTimer(m_timer_handle); }
+        if (_time > 0) { m_mstime = _time; }
         return *this;
     }
 
     // NOLINTNEXTLINE
     bool await_ready() noexcept {
-        if (m_mstime == 0 || (m_timer_handle != nullptr)) {
-            return true;
-        }
+        if (m_mstime == 0 || (m_timer_handle != nullptr)) { return true; }
 
         m_timer_handle = Worker::GetCurrentWorker()->AddLocalTimer(m_mstime, [this]() {
             m_timer_handle = nullptr;

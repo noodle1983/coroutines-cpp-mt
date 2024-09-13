@@ -29,13 +29,9 @@ WorkerGroup::~WorkerGroup() {
 
 void WorkerGroup::Start(bool _to_wait_stop) {
     m_wait_stop = _to_wait_stop;
-    if (0 == m_thread_count) {
-        return;
-    }
+    if (0 == m_thread_count) { return; }
 
-    if (NULL != m_workers) {
-        return;
-    }
+    if (NULL != m_workers) { return; }
 
     m_workers = new Worker[m_thread_count];
     m_threads.reserve(m_thread_count);
@@ -49,9 +45,7 @@ void WorkerGroup::Start(bool _to_wait_stop) {
 
 void WorkerGroup::WaitStop() {
     lock_guard<mutex> lock(m_stop_mutex);
-    if (NULL == m_workers) {
-        return;
-    }
+    if (NULL == m_workers) { return; }
 
     unsigned int thread_index = 0;
     while (true) {
@@ -60,15 +54,11 @@ void WorkerGroup::WaitStop() {
             m_workers[thread_index].WaitStop();
             thread_index++;
         }
-        if (thread_index == m_thread_count) {
-            break;
-        }
+        if (thread_index == m_thread_count) { break; }
 
         this_thread::sleep_for(chrono::milliseconds(1));
     }
-    for (unsigned i = 0; i < m_thread_count; i++) {
-        m_threads[i].join();
-    }
+    for (unsigned i = 0; i < m_thread_count; i++) { m_threads[i].join(); }
     delete[] m_workers;
     m_workers = NULL;
 }
@@ -77,16 +67,10 @@ void WorkerGroup::WaitStop() {
 
 void WorkerGroup::Stop() {
     lock_guard<mutex> lock(m_stop_mutex);
-    if (NULL == m_workers) {
-        return;
-    }
+    if (NULL == m_workers) { return; }
 
-    for (unsigned i = 0; i < m_thread_count; i++) {
-        m_workers[i].Stop();
-    }
-    for (unsigned i = 0; i < m_thread_count; i++) {
-        m_threads[i].join();
-    }
+    for (unsigned i = 0; i < m_thread_count; i++) { m_workers[i].Stop(); }
+    for (unsigned i = 0; i < m_thread_count; i++) { m_threads[i].join(); }
     delete[] m_workers;
     m_workers = NULL;
 }
@@ -94,14 +78,16 @@ void WorkerGroup::Stop() {
 //-----------------------------------------------------------------------------
 
 // template<>
-// void WorkerGroup::process<(WorkerGroup)PreDefWorkerGroup::CurrentWorker>(SessionId theId, Job* job){
+// void WorkerGroup::process<(WorkerGroup)PreDefWorkerGroup::CurrentWorker>(SessionId
+// theId, Job* job){
 //     Worker::GetCurrentWorker()->process(job);
 // }
 //
 ////-----------------------------------------------------------------------------
 //
 // template<>
-// void WorkerGroup::process<(WorkerGroup)PreDefWorkerGroup::Main>(SessionId theId, Job* job){
+// void WorkerGroup::process<(WorkerGroup)PreDefWorkerGroup::Main>(SessionId theId, Job*
+// job){
 //    Worker::GetMainWorker()->process(job);
 //}
 

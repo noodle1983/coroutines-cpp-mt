@@ -13,9 +13,7 @@ public:
     static DataType* Instance() {
         if (NULL == m_data_holder.get()) {
             std::lock_guard<std::mutex> lock(m_db_lock_mutex);
-            if (NULL == m_data_holder.get()) {
-                m_data_holder.reset(new DataType);
-            }
+            if (NULL == m_data_holder.get()) { m_data_holder.reset(new DataType); }
         }
         return m_data_holder.get();
     }
@@ -42,9 +40,7 @@ public:
     static DataType* Instance() {
         if (NULL == m_data_holder.get()) {
             std::lock_guard<std::mutex> lock(m_db_lock_mutex);
-            if (NULL == m_data_holder.get()) {
-                m_data_holder.reset(new DataType(instanceId));
-            }
+            if (NULL == m_data_holder.get()) { m_data_holder.reset(new DataType(instanceId)); }
         }
         return m_data_holder.get();
     }

@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <string>
 
 #include "gtest/gtest.h"
 #include "log.hpp"
@@ -40,13 +41,15 @@ TEST_F(CoroutinesCppMtTest, TypeSize) {
     LOG_TRACE("----------------------------------------");
     LOG_TRACE("sizeof nd::CoroutineController<void> = " << sizeof(nd::CoroutineController<void>));
     LOG_TRACE("\tsizeof nd::ID<CoroutineController<void>> = " << sizeof(nd::ID<nd::CoroutineController<void>>));
-    LOG_TRACE("\tsizeof std::list<CoroutineController<void>::WaitingTask> = " << sizeof(std::list<nd::CoroutineController<void>::WaitingTask>));
+    LOG_TRACE("\tsizeof std::list<CoroutineController<void>::WaitingTask> = "
+              << sizeof(std::list<nd::CoroutineController<void>::WaitingTask>));
     LOG_TRACE("\tsizeof std::mutex = " << sizeof(std::mutex));
     LOG_TRACE("\tsizeof std::coroutine_handle<> = " << sizeof(std::coroutine_handle<>));
     LOG_TRACE("----------------------------------------");
     LOG_TRACE("sizeof nd::CoroutineController<char> = " << sizeof(nd::CoroutineController<char>));
     LOG_TRACE("\tsizeof nd::ID<CoroutineController<char>> = " << sizeof(nd::ID<nd::CoroutineController<char>>));
-    LOG_TRACE("\tsizeof std::list<CoroutineController<char>::WaitingTask> = " << sizeof(std::list<nd::CoroutineController<char>::WaitingTask>));
+    LOG_TRACE("\tsizeof std::list<CoroutineController<char>::WaitingTask> = "
+              << sizeof(std::list<nd::CoroutineController<char>::WaitingTask>));
     LOG_TRACE("\tsizeof std::mutex = " << sizeof(std::mutex));
     LOG_TRACE("\tsizeof std::coroutine_handle<> = " << sizeof(std::coroutine_handle<>));
     LOG_TRACE("\tsizeof char = " << sizeof(char));
@@ -58,27 +61,37 @@ TEST_F(CoroutinesCppMtTest, TypeSize) {
 TEST_F(CoroutinesCppMtTest, Wait_Bg_Task_On_Main_Thread) {
     auto main_task = []() -> nd::Task<> {
         LOG_TRACE("-> main task in worker" << nd::Worker::GetCurrWorkerName());
-        LOG_TRACE("----------------------------------------");
 
-        co_await []() -> nd::Task<> {
-            LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
-            co_await nd::TimeWaiter(1000);  // NOLINT
-            LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 1 sec later");
-            co_return;
-        }()
-                             .RunOnProcessor(WorkerGroup::BG1);  // NOLINT, clang-format insists on this indent...
+        LOG_TRACE("------------------------------------> coroutinue 2");
+        {
+            // bg_task start from here
+            auto bg_task = []() -> nd::Task<> {
+                LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+                co_await nd::TimeWaiter(1000);  // NOLINT
+                LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 1 sec later");
+                co_return;
+            }();
+            co_await bg_task.RunOnProcessor(WorkerGroup::BG1);
 
-        LOG_TRACE("----------------------------------------");
+            // bg_task destroys here.
+            // all objects must be destroyed, as shown in the log.
+        }
+        LOG_TRACE("<------------------------------------ coroutinue 2");
 
-        co_await []() -> nd::Task<> {
-            LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
-            co_await nd::TimeWaiter(2000);  // NOLINT
-            LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 2 secs later");
-            co_return;
-        }()
-                             .RunOnProcessor(WorkerGroup::BG2);  // NOLINT
-
-        LOG_TRACE("----------------------------------------");
+        LOG_TRACE("------------------------------------> coroutinue 3");
+        {
+            // another bg_task start from here
+            auto bg_task = []() -> nd::Task<> {
+                LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+                co_await nd::TimeWaiter(2000);  // NOLINT
+                LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 2 secs later");
+                co_return;
+            }();
+            co_await bg_task.RunOnProcessor(WorkerGroup::BG2);
+            // bg_task destroys here.
+            // all objects must be destroyed, as shown in the log.
+        }
+        LOG_TRACE("<------------------------------------ coroutinue 3");
 
         // you should see the destruction log of upper promise and task
         // main's resume is called in the BG1 thread, it can be run before the
@@ -97,28 +110,31 @@ TEST_F(CoroutinesCppMtTest, Wait_Bg_Task_On_Main_Thread) {
 TEST_F(CoroutinesCppMtTest, Run_Multi_Task_On_Same_Thread) {
     auto main_task = []() -> nd::Task<> {
         LOG_TRACE("-> main task in worker" << nd::Worker::GetCurrWorkerName());
-        LOG_TRACE("----------------------------------------");
 
-        auto bg_task1 = []() -> nd::Task<> {
-            LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
-            co_await nd::TimeWaiter(1500);  // NOLINT
-            LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 1.5 sec later");
-            co_return;
-        }();
-        bg_task1.RunOnProcessor(WorkerGroup::BG1);
+        LOG_TRACE("------------------------------------> mixed coroutinue 5 and 6");
+        {
+            auto bg_task1 = []() -> nd::Task<> {
+                LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+                co_await nd::TimeWaiter(1500);  // NOLINT
+                LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 1.5 sec later");
+                co_return;
+            }();
+            bg_task1.RunOnProcessor(WorkerGroup::BG1);
 
-        auto bg_task2 = []() -> nd::Task<> {
-            LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
-            co_await nd::TimeWaiter(1000);  // NOLINT
-            FLOG_TRACE("<- bg task in worker %s after 1 sec later", nd::Worker::GetCurrWorkerName());
-            co_return;
-        }();
-        bg_task2.RunOnProcessor(WorkerGroup::BG1);
+            auto bg_task2 = []() -> nd::Task<> {
+                LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+                co_await nd::TimeWaiter(1000);  // NOLINT
+                FLOG_TRACE("<- bg task in worker %s after 1 sec later", nd::Worker::GetCurrWorkerName());
+                co_return;
+            }();
+            bg_task2.RunOnProcessor(WorkerGroup::BG1);
 
-        co_await bg_task1;
-        co_await bg_task2;
+            // bg_task2's coroutine handle is compleated and destroyed first, bg_task2 remains
+            co_await bg_task1;
+            co_await bg_task2;
+        }
+        FLOG_TRACE("<------------------------------------ mixed coroutinue 5 and 6");
 
-        FLOG_TRACE("----------------------------------------");
         // you should see the destruction log of upper promise and task
         // main's resume is called in the BG1 thread, it can be run before the
         // destruction of upper promise and task. so wait for a while to see the log
@@ -133,4 +149,40 @@ TEST_F(CoroutinesCppMtTest, Run_Multi_Task_On_Same_Thread) {
     nd::Worker::GetMainWorker()->WaitUntilEmpty();
 }
 
-TEST_F(CoroutinesCppMtTest, Long_DivideBy_Long) {}
+TEST_F(CoroutinesCppMtTest, ReturnValueFromTask) {
+    auto main_task = []() -> nd::Task<> {
+        LOG_TRACE("-> main task in worker" << nd::Worker::GetCurrWorkerName());
+        const char* str = "hello world!";
+        std::string strstr = std::string(str);
+
+        {
+            auto bg_task = [&str]() -> nd::Task<std::string> {
+                LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+                co_return std::string{str};
+            }();
+            std::string result = co_await bg_task.RunOnProcessor(WorkerGroup::BG1);
+            EXPECT_EQ(result, str);
+        }
+
+        {
+            auto bg_task = [&strstr]() -> nd::Task<std::string> {
+                LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+                co_return strstr;
+            }();
+            std::string result = co_await bg_task.RunOnProcessor(WorkerGroup::BG1);
+            EXPECT_EQ(result, str);
+        }
+
+        // you should see the destruction log of upper promise and task
+        // main's resume is called in the BG1 thread, it can be run before the
+        // destruction of upper promise and task. so wait for a while to see the log
+        co_await nd::TimeWaiter(1);  // NOLINT
+
+        FLOG_TRACE("<- main task in worker %s", nd::Worker::GetCurrWorkerName());
+    }();
+
+    main_task.RunOnProcessor();  // run on current worker, which is main worker on
+                                 // the marked main thread.
+    main_task.WaitInMain();
+    nd::Worker::GetMainWorker()->WaitUntilEmpty();
+}
