@@ -87,6 +87,12 @@ public:
         return m_result;
     };
 
+    void SaveException(std::exception_ptr _exception) { m_exception = _exception; }
+    std::exception_ptr GetException() { return m_exception; }
+    void CheckException() {
+        if (m_exception) { std::rethrow_exception(m_exception); }
+    }
+
 private:
     ID<CoroutineController<Empty>> m_id;
 
@@ -96,6 +102,7 @@ private:
     std::coroutine_handle<> m_coroutine;
 
     NO_UNIQUE_ADDRESS Maybe<!std::is_void_v<ReturnType>, ReturnType> m_result;
+    std::exception_ptr m_exception;
 };
 
 static_assert(sizeof(CoroutineController<void>) != sizeof(CoroutineController<char>));
@@ -190,7 +197,11 @@ public:
     }
 
     // NOLINTNEXTLINE
-    void unhandled_exception() noexcept { LOG_TRACE("promise-" << m_id << " unhandled exception"); }
+    void unhandled_exception() noexcept { 
+        LOG_TRACE("promise-" << m_id << " unhandled exception"); 
+        m_controller->SaveException(std::current_exception());
+        m_controller->OnCoroutineReturn();
+    }
 
 private:
     CorotineControllerSharedPtr m_controller;
@@ -237,7 +248,11 @@ public:
     }
 
     // NOLINTNEXTLINE
-    void unhandled_exception() noexcept { LOG_TRACE("promise-" << m_id << " unhandled exception"); }
+    void unhandled_exception() noexcept { 
+        LOG_TRACE("promise-" << m_id << " unhandled exception"); 
+        m_controller->SaveException(std::current_exception());
+        m_controller->OnCoroutineReturn();
+    }
 
 private:
     CorotineControllerSharedPtr m_controller;
@@ -275,12 +290,15 @@ public:
     }
 
     template <typename CheckType = ReturnType>  // NOLINTNEXTLINE
-    typename std::enable_if_t<std::is_void_v<CheckType>, void> await_resume() const noexcept {
+    typename std::enable_if_t<std::is_void_v<CheckType>, void> await_resume() const {
         LOG_TRACE("task-" << ParentTask::m_id << " return void");
+        ParentTask::m_controller->CheckException();
     }
 
     template <typename CheckType = ReturnType>  // NOLINTNEXTLINE
-    typename std::enable_if_t<!std::is_void_v<CheckType>, CheckType> await_resume() const noexcept {
+    typename std::enable_if_t<!std::is_void_v<CheckType>, const CheckType>& await_resume() const {
+        LOG_TRACE("task-" << ParentTask::m_id << " return value&");
+        ParentTask::m_controller->CheckException();
         return ParentTask::m_controller->GetResult();
     }
 

@@ -186,3 +186,32 @@ TEST_F(CoroutinesCppMtTest, ReturnValueFromTask) {
     main_task.WaitInMain();
     nd::Worker::GetMainWorker()->WaitUntilEmpty();
 }
+
+TEST_F(CoroutinesCppMtTest, HandleExceptionFromTask) {
+    auto main_task = []() -> nd::Task<> {
+        LOG_TRACE("-> main task in worker" << nd::Worker::GetCurrWorkerName());
+        try
+        {
+            auto bg_task = []() -> nd::Task<> {
+				LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+                throw std::runtime_error("runtime error");
+				LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+                co_return;
+            }();
+            co_await bg_task.RunOnProcessor(WorkerGroup::BG1);
+        }
+        catch (const std::exception& e)
+        {
+            LOG_TRACE("exception caught: " << e.what());
+        }
+
+        co_await nd::TimeWaiter(1);  // NOLINT
+
+        FLOG_TRACE("<- main task in worker %s", nd::Worker::GetCurrWorkerName());
+    }();
+
+    main_task.RunOnProcessor();  // run on current worker, which is main worker on
+                                 // the marked main thread.
+    main_task.WaitInMain();
+    nd::Worker::GetMainWorker()->WaitUntilEmpty();
+}
