@@ -152,13 +152,16 @@ TEST_F(CoroutinesCppMtTest, Run_Multi_Task_On_Same_Thread) {
 TEST_F(CoroutinesCppMtTest, ReturnValueFromTask) {
     auto main_task = []() -> nd::Task<> {
         const char* str = "hello world!";
-        FLOG_TRACE("-> main task in worker:0x%lx-%s", (intptr_t)str, str);
+        FLOG_TRACE("-> main task in worker:0x%zx-%s", (intptr_t)str, str);
 
         try {
-            auto bg_task = [str]() -> nd::Task<std::string> {
-                FLOG_TRACE("-> bg task return 0x%lx[%s]", (intptr_t)str, str);
-                co_return std::string{str};
-            }();
+            // it is dangerous(crash) to capture a attr/ref-attr in a coroutinue,
+            // though it is garanted that the attr/ref-attr is alive
+            // so pass the attr as a parameter instead of capturing it.
+            auto bg_task = [](auto& _str) -> nd::Task<std::string> {
+                FLOG_TRACE("-> bg task return 0x%zx[%s]", (intptr_t)_str, _str);
+                co_return std::string{_str};
+            }(str);
             std::string result = co_await bg_task.RunOnProcessor(WorkerGroup::BG1);
             EXPECT_EQ(result, str);
         } catch (const std::exception& e) { LOG_TRACE("exception caught: " << e.what()); }
@@ -166,11 +169,14 @@ TEST_F(CoroutinesCppMtTest, ReturnValueFromTask) {
         std::string strstr = std::string(str);
         LOG_TRACE("-> main task in worker:" << strstr);
         try {
-            auto bg_task = [strstr, str]() -> nd::Task<std::string> {
-                EXPECT_EQ(strstr, str);
-                LOG_TRACE("-> bg task in worker:" << strstr);
-                co_return strstr;
-            }();
+            // it is dangerous(crash) to capture a attr/ref-attr in a coroutinue,
+            // though it is garanted that the attr/ref-attr is alive
+            // so pass the attr as a parameter instead of capturing it.
+            auto bg_task = [](auto& _strstr, auto& _str) -> nd::Task<std::string> {
+                EXPECT_EQ(_strstr, _str);
+                LOG_TRACE("-> bg task in worker:" << _strstr);
+                co_return _strstr;
+            }(strstr, str);
             std::string result = co_await bg_task.RunOnProcessor(WorkerGroup::BG1);
             EXPECT_EQ(result, str);
         } catch (const std::exception& e) { LOG_TRACE("exception caught: " << e.what()); }
