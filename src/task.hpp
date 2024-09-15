@@ -75,7 +75,7 @@ public:
     }
 
     template <typename CheckType = ReturnType>
-    void SaveResult(typename std::enable_if_t<!std::is_void_v<CheckType>, ReturnType>& _value) {
+    void SaveResult(typename std::enable_if_t<!std::is_void_v<CheckType>, const ReturnType>& _value) {
         m_result = _value;
     };
     template <typename CheckType = ReturnType>
@@ -183,7 +183,7 @@ public:
     Task<ReturnType> get_return_object() noexcept;
 
     // NOLINTNEXTLINE
-    void return_value(ReturnType& _value) noexcept {
+    void return_value(const ReturnType& _value) noexcept {
         LOG_TRACE("promise-" << m_id << " return value&");
         m_controller->SaveResult(_value);
         m_controller->OnCoroutineReturn();
@@ -197,8 +197,8 @@ public:
     }
 
     // NOLINTNEXTLINE
-    void unhandled_exception() noexcept { 
-        LOG_TRACE("promise-" << m_id << " unhandled exception"); 
+    void unhandled_exception() noexcept {
+        LOG_TRACE("promise-" << m_id << " unhandled exception");
         m_controller->SaveException(std::current_exception());
         m_controller->OnCoroutineReturn();
     }
@@ -248,8 +248,8 @@ public:
     }
 
     // NOLINTNEXTLINE
-    void unhandled_exception() noexcept { 
-        LOG_TRACE("promise-" << m_id << " unhandled exception"); 
+    void unhandled_exception() noexcept {
+        LOG_TRACE("promise-" << m_id << " unhandled exception");
         m_controller->SaveException(std::current_exception());
         m_controller->OnCoroutineReturn();
     }

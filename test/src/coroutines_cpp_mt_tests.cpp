@@ -151,27 +151,29 @@ TEST_F(CoroutinesCppMtTest, Run_Multi_Task_On_Same_Thread) {
 
 TEST_F(CoroutinesCppMtTest, ReturnValueFromTask) {
     auto main_task = []() -> nd::Task<> {
-        LOG_TRACE("-> main task in worker" << nd::Worker::GetCurrWorkerName());
         const char* str = "hello world!";
-        std::string strstr = std::string(str);
+        FLOG_TRACE("-> main task in worker:0x%lx-%s", (intptr_t)str, str);
 
-        {
-            auto bg_task = [&str]() -> nd::Task<std::string> {
-                LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+        try {
+            auto bg_task = [str]() -> nd::Task<std::string> {
+                FLOG_TRACE("-> bg task return 0x%lx[%s]", (intptr_t)str, str);
                 co_return std::string{str};
             }();
             std::string result = co_await bg_task.RunOnProcessor(WorkerGroup::BG1);
             EXPECT_EQ(result, str);
-        }
+        } catch (const std::exception& e) { LOG_TRACE("exception caught: " << e.what()); }
 
-        {
-            auto bg_task = [&strstr]() -> nd::Task<std::string> {
-                LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+        std::string strstr = std::string(str);
+        LOG_TRACE("-> main task in worker:" << strstr);
+        try {
+            auto bg_task = [strstr, str]() -> nd::Task<std::string> {
+                EXPECT_EQ(strstr, str);
+                LOG_TRACE("-> bg task in worker:" << strstr);
                 co_return strstr;
             }();
             std::string result = co_await bg_task.RunOnProcessor(WorkerGroup::BG1);
             EXPECT_EQ(result, str);
-        }
+        } catch (const std::exception& e) { LOG_TRACE("exception caught: " << e.what()); }
 
         // you should see the destruction log of upper promise and task
         // main's resume is called in the BG1 thread, it can be run before the
@@ -190,20 +192,15 @@ TEST_F(CoroutinesCppMtTest, ReturnValueFromTask) {
 TEST_F(CoroutinesCppMtTest, HandleExceptionFromTask) {
     auto main_task = []() -> nd::Task<> {
         LOG_TRACE("-> main task in worker" << nd::Worker::GetCurrWorkerName());
-        try
-        {
+        try {
             auto bg_task = []() -> nd::Task<> {
-				LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+                LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
                 throw std::runtime_error("runtime error");
-				LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+                LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
                 co_return;
             }();
             co_await bg_task.RunOnProcessor(WorkerGroup::BG1);
-        }
-        catch (const std::exception& e)
-        {
-            LOG_TRACE("exception caught: " << e.what());
-        }
+        } catch (const std::exception& e) { LOG_TRACE("exception caught: " << e.what()); }
 
         co_await nd::TimeWaiter(1);  // NOLINT
 

@@ -56,9 +56,9 @@ coroutines_cpp_mt.clean() {
 
 coroutines_cpp_mt.build() {
   run "cd build/run"
-  run "cmake ../.. "
+  run "CXX=clang++-20 cmake -DCMAKE_BUILD_TYPE=Debug ../.. "
   run.set-next show-output-on
-  run "make -j 12"
+  run "VERBOSE=1 make -j 12"
   run "make install | egrep -v 'gmock|gtest'"
   run "cd ${ProjectRoot}"
 }
