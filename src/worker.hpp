@@ -77,7 +77,7 @@ public:
     void ThreadMain();
 
     void Step();
-    void HandleLocalTimer();
+    CppDuration HandleLocalTimer();
 
 private:
     void InternalStep();

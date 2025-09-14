@@ -32,7 +32,9 @@
 #include <chrono>
 
 namespace nd {
-	using CppTimePoint = std::chrono::time_point < std::chrono::steady_clock >;
+	using CppClock = std::chrono::high_resolution_clock;
+	using CppTimePoint = std::chrono::time_point < CppClock >;
+	using CppDuration = CppClock::duration;
 	using TimerCallback = std::function<void()>;
 
 	struct min_heap_item_t {

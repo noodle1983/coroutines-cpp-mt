@@ -83,13 +83,13 @@ TimerHandle Worker::AddLocalTimer(uint64_t _ms_time, TimerCallback _callback) {
 
     TimerHandle timeout_evt = new min_heap_item_t();
     timeout_evt->callback = _callback;
-    timeout_evt->timeout = std::chrono::steady_clock::now() + std::chrono::milliseconds(_ms_time);
+    timeout_evt->timeout = CppClock::now() + std::chrono::milliseconds(_ms_time);
 
     if (-1 == min_heap_push(&m_timer_heap, timeout_evt)) {
         LOG_FATAL("not enough memory!");
         exit(-1);
     }
-    if (timer_heap_empty) { m_queue_cond.notify_one(); }
+    if (timer_heap_empty ||(min_heap_top(&m_timer_heap) == timeout_evt)) { m_queue_cond.notify_one(); }
     return timeout_evt;
 }
 
@@ -104,20 +104,22 @@ void Worker::CancelLocalTimer(TimerHandle& _event) {
 
 //-----------------------------------------------------------------------------
 
-void Worker::HandleLocalTimer() {
+CppDuration Worker::HandleLocalTimer() {
     if (min_heap_empty(&m_timer_heap) == 0) {
-        auto time_now = std::chrono::steady_clock::now();
+        auto time_now = CppClock::now();
         while (min_heap_empty(&m_timer_heap) == 0) {
             TimerHandle top_event = min_heap_top(&m_timer_heap);
             if (item_cmp(top_event->timeout, time_now, <=)) {
+                //LOG_TRACE("diff time:" << top_event->timeout - time_now);
                 min_heap_pop(&m_timer_heap);
                 (top_event->callback)();
                 delete top_event;
             } else {
-                break;
+                return top_event->timeout - time_now;
             }
         }
     }
+    return CppDuration::max();
 }
 
 //-----------------------------------------------------------------------------
@@ -164,19 +166,25 @@ void Worker::InternalStep() {
     }
 
     // handle timer
-    HandleLocalTimer();
+    auto next_duration = HandleLocalTimer();
 
     unique_lock<mutex> queue_lock(m_queue_mutex);
     if (!m_job_queue.empty()) { return; }
 
-    constexpr size_t MAX_WAIT_TIME_WITH_TIMER_MICROSECONDS =
-        500;  // it is the balance of the timer accuracy and the cpu usage
-    constexpr size_t MAX_WAIT_TIME_MICROSECONDS = 10000;
-    if (!m_is_to_stop && !m_is_wait_stop && m_job_queue.empty() && (min_heap_empty(&m_timer_heap) == 0)) {
-        m_queue_cond.wait_for(queue_lock, chrono::microseconds(MAX_WAIT_TIME_WITH_TIMER_MICROSECONDS));
-    } else {
-        m_queue_cond.wait_for(queue_lock, chrono::microseconds(MAX_WAIT_TIME_MICROSECONDS));
-    }
+    //constexpr size_t MAX_WAIT_TIME_WITH_TIMER_MICROSECONDS =
+    //    500;  // it is the balance of the timer accuracy and the cpu usage
+    //constexpr size_t MAX_WAIT_TIME_MICROSECONDS = 10000;
+    const auto MAX_WAIT_TIME_MICROSECONDS = chrono::microseconds(10000);
+    const auto& wait_duration = (next_duration < MAX_WAIT_TIME_MICROSECONDS) ? next_duration : MAX_WAIT_TIME_MICROSECONDS;
+	m_queue_cond.wait_for(queue_lock, wait_duration);
+
+    //if (!m_is_to_stop && !m_is_wait_stop && m_job_queue.empty() && (min_heap_empty(&m_timer_heap) == 0)) {
+    //    auto wait_duration =
+    //        chrono::duration_cast<chrono::microseconds>(next_time_point - chrono::high_resolution_clock::now());
+    //    m_queue_cond.wait_for(queue_lock, chrono::microseconds(MAX_WAIT_TIME_WITH_TIMER_MICROSECONDS));
+    //} else {
+    //    m_queue_cond.wait_for(queue_lock, chrono::microseconds(MAX_WAIT_TIME_MICROSECONDS));
+    //}
 }
 
 //-----------------------------------------------------------------------------
