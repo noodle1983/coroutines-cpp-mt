@@ -4,6 +4,12 @@
 *.lo
 *.o
 *.obj
+.vs
+*.log
+*.bak
+Debug
+Release
+*.user
 
 # Precompiled Headers
 *.gch

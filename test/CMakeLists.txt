@@ -13,6 +13,9 @@ add_executable(coroutines_cpp_mt_tests ${SOURCE_FILES})
 target_link_libraries(coroutines_cpp_mt_tests coroutines_cpp_mt gtest)
 #set_property(TARGET coroutines_cpp_mt_tests PROPERTY
 #  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+if(MSVC)
+    target_link_libraries(coroutines_cpp_mt_tests Winmm)
+endif()
 
 install(TARGETS coroutines_cpp_mt_tests DESTINATION bin)
 

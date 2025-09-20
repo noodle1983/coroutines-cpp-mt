@@ -4,8 +4,12 @@
 #include "gtest/gtest.h"
 #include "log.hpp"
 #include "task.hpp"
-#include "time_waiter.hpp"
+#include "waiter/time_waiter.hpp"
 #include "worker_manager.hpp"
+
+#if _MSC_VER
+#include <windows.h>
+#endif 
 
 using namespace std;
 
@@ -24,6 +28,10 @@ enum {
 class CoroutinesCppMtTest : public ::testing::Test {
 protected:
     static void SetUpTestCase() {
+#if _MSC_VER
+        timeBeginPeriod(1);
+#endif
+
         // usage 2 : start thread
         nd::Worker::MarkMainThread();
         g_worker_mgr->Init(WorkerGroup::MAX);
@@ -32,7 +40,11 @@ protected:
         LOG_DEBUG("worker inited!");
     };
 
-    static void TearDownTestCase() {};
+    static void TearDownTestCase() {
+#if _MSC_VER
+        timeEndPeriod(1);
+#endif
+    };
     void SetUp() override {}
     void TearDown() override {}
 };

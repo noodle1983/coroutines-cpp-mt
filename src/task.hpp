@@ -4,6 +4,7 @@
 #include <list>
 #include <tuple>
 #include <type_traits>
+#include <source_location>
 
 #include "log.hpp"
 #include "worker_manager.hpp"
@@ -113,7 +114,12 @@ public:
     friend class CoroutineController<ReturnType>;
     using CorotineControllerSharedPtr = std::shared_ptr<CoroutineController<ReturnType>>;
 
-    BaseTask(CorotineControllerSharedPtr& _controller) : m_controller(_controller), m_running_worker(nullptr) {}
+    BaseTask(CorotineControllerSharedPtr& _controller, const char* _stat_name, const std::source_location& _loc) 
+        : m_controller(_controller)
+        , m_running_worker(nullptr) 
+        , m_run_location(_loc)
+        , m_stat_name(_stat_name)
+    {}
     virtual ~BaseTask() {}
 
     void BaseRunOnProcessor(int _worker_group_id = PreDefWorkerGroup::Current, const SessionId _the_id = 0) {
@@ -149,6 +155,9 @@ protected:
 
     CorotineControllerSharedPtr m_controller;
     nd::Worker* m_running_worker;
+
+    std::source_location m_run_location;
+    const char* m_stat_name;
 };
 
 //-----------------------------------------
@@ -266,7 +275,9 @@ public:
     using CorotineControllerSharedPtr = std::shared_ptr<CoroutineController<ReturnType>>;
     using ParentTask = BaseTask<ReturnType>;
 
-    Task(CorotineControllerSharedPtr& _controller) : ParentTask(_controller) {
+    Task(CorotineControllerSharedPtr& _controller, const char* _stat_name = nullptr, const std::source_location& _loc = std::source_location::current()) 
+        : ParentTask(_controller, _stat_name, _loc)
+    {
         LOG_TRACE("task-" << ParentTask::m_id << " created");
     }
     virtual ~Task() { LOG_TRACE("task-" << ParentTask::m_id << " destroyed"); }
