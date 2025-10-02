@@ -15,6 +15,8 @@
 namespace nd {
 
 constexpr size_t MAX_WORKER_NAME_LEN = 32;
+class ITask;
+class IWaiter;
 
 class Worker {
 public:
@@ -79,6 +81,13 @@ public:
     void Step();
     CppDuration HandleLocalTimer();
 
+    // task
+    void OnTaskStart(ITask* _task);
+    void OnTaskRun(ITask* _task);
+    void OnTaskSuspend(IWaiter* _waiter);
+    void OnTaskEnd();
+    ITask* GetCurrentRunningTask() { return m_current_running_task; }
+
 private:
     void InternalStep();
     thread_local static Worker* s_current_worker;
@@ -103,6 +112,10 @@ private:
     std::atomic<bool> m_is_to_stop;
     std::atomic<bool> m_is_wait_stop;
     std::atomic<bool> m_is_stoped;
+
+    // current running task in this worker thread
+    ITask* m_current_running_task;
+    std::unordered_map<size_t, ITask*> m_tasks;
 };
 }  // namespace nd
 

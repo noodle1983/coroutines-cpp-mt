@@ -4,6 +4,8 @@
 
 #include "log.hpp"
 #include "min_heap.h"
+#include "task.hpp"
+#include "waiter.hpp"
 
 using namespace nd;
 using namespace std;
@@ -21,7 +23,8 @@ Worker::Worker()
       m_worker_num(0),
       m_is_to_stop(false),
       m_is_wait_stop(false),
-      m_is_stoped(false) {
+      m_is_stoped(false),
+      m_current_running_task(nullptr){
     min_heap_ctor(&m_timer_heap);
 }
 
@@ -168,23 +171,15 @@ void Worker::InternalStep() {
     // handle timer
     auto next_duration = HandleLocalTimer();
 
+    // end of handling
+    assert(m_current_running_task == nullptr);
+
     unique_lock<mutex> queue_lock(m_queue_mutex);
     if (!m_job_queue.empty()) { return; }
 
-    //constexpr size_t MAX_WAIT_TIME_WITH_TIMER_MICROSECONDS =
-    //    500;  // it is the balance of the timer accuracy and the cpu usage
-    //constexpr size_t MAX_WAIT_TIME_MICROSECONDS = 10000;
     const auto MAX_WAIT_TIME_MICROSECONDS = chrono::microseconds(10000);
     const auto& wait_duration = (next_duration < MAX_WAIT_TIME_MICROSECONDS) ? next_duration : MAX_WAIT_TIME_MICROSECONDS;
 	m_queue_cond.wait_for(queue_lock, wait_duration);
-
-    //if (!m_is_to_stop && !m_is_wait_stop && m_job_queue.empty() && (min_heap_empty(&m_timer_heap) == 0)) {
-    //    auto wait_duration =
-    //        chrono::duration_cast<chrono::microseconds>(next_time_point - chrono::high_resolution_clock::now());
-    //    m_queue_cond.wait_for(queue_lock, chrono::microseconds(MAX_WAIT_TIME_WITH_TIMER_MICROSECONDS));
-    //} else {
-    //    m_queue_cond.wait_for(queue_lock, chrono::microseconds(MAX_WAIT_TIME_MICROSECONDS));
-    //}
 }
 
 //-----------------------------------------------------------------------------
@@ -193,3 +188,44 @@ void Worker::Step() {
     assert(std::this_thread::get_id() == s_current_thread_id);
     InternalStep();
 }
+
+//-----------------------------------------------------------------------------
+
+void Worker::OnTaskStart(ITask* _task) { 
+	assert(_task);
+
+    auto task_id = _task->Id();
+    assert(m_tasks.find(task_id) == m_tasks.end());
+    m_tasks[task_id] = _task;
+
+	OnTaskRun(_task);
+}
+
+//-----------------------------------------------------------------------------
+
+void Worker::OnTaskRun(ITask* _task) { 
+    assert(m_current_running_task == nullptr);
+    m_current_running_task = _task; 
+}
+
+//-----------------------------------------------------------------------------
+
+void Worker::OnTaskSuspend(IWaiter* _waiter) { 
+    assert(m_current_running_task != nullptr);
+    m_current_running_task = nullptr; 
+}
+
+//-----------------------------------------------------------------------------
+
+void Worker::OnTaskEnd() { 
+    assert(m_current_running_task != nullptr);
+
+    auto it = m_tasks.find(m_current_running_task->Id());
+    assert(it != m_tasks.end());
+
+    m_tasks.erase(it);
+    m_current_running_task = nullptr; 
+}
+
+//-----------------------------------------------------------------------------
+

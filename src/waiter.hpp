@@ -5,6 +5,7 @@
 
 #include "worker.hpp"
 #include "log.hpp"
+#include "interfaces.hpp"
 
 namespace nd {
 
@@ -21,16 +22,16 @@ namespace nd {
  * };
  */
 template<typename ImplType>
-class TaskInnerWaiter {
+class TaskInnerWaiter : public IWaiter {
 public:
     template <typename T = ImplType, typename = std::enable_if_t<std::is_default_constructible_v<T>>>
     TaskInnerWaiter(const std::source_location& _loc) 
-        : m_coroutine(nullptr), m_from_worker(nullptr), m_suspend_location(_loc)
+        : m_task(nullptr), m_src_id(_loc), m_resume_key(0)
     {}
 
     template<typename Arg0>
     TaskInnerWaiter(Arg0 _arg0, const std::source_location& _loc = std::source_location::current()) 
-        : m_impl(this, _arg0), m_coroutine(nullptr), m_from_worker(nullptr), m_suspend_location(_loc) {}
+        : m_impl(this, _arg0), m_src_id(_loc) {}
     //template<typename... Args>
     //TaskInnerWaiter(Args&&... _args, const std::source_location& _loc = std::source_location::current()) 
     //    : m_impl(this, std::forward<Args>(_args)...), m_coroutine(nullptr), m_from_worker(nullptr), m_suspend_location(_loc) {}
@@ -43,9 +44,14 @@ public:
 
     // NOLINTNEXTLINE
     void await_suspend(std::coroutine_handle<> _awaiting_coroutine) noexcept { 
-        m_coroutine = _awaiting_coroutine;
-        m_from_worker = Worker::GetCurrentWorker();
+        auto worker = Worker::GetCurrentWorker();
+        m_task = worker->GetCurrentRunningTask();
+
+        assert(m_task != nullptr);
+        m_resume_key = m_task->GetResumeKey(this);
+
         m_impl.AwaitSuspend();
+        worker->OnTaskSuspend(this);
     }
 
     // NOLINTNEXTLINE
@@ -57,36 +63,17 @@ public:
         }
     }
 
-    void Resume() {
-        if (m_from_worker == nullptr) {
-            LOG_ERROR("no from worker to resume in, pre suspended from " << m_suspend_location.file_name() << ":" << m_suspend_location.line()); 
-            return;
-        }
-        if (m_from_worker == Worker::GetCurrentWorker()) {
-            ResumeInTheRightWorker();
-        } else if (m_from_worker != NULL)
-        {
-            m_from_worker->AddJob(new nd::Job{[this]() { 
-                ResumeInTheRightWorker();
-            }});
-        } 
+    void Resume() { 
+        assert(m_task != nullptr);
+        m_task->Resume(this, m_resume_key);
+        m_resume_key = 0;
     }
 
 private:
-    void ResumeInTheRightWorker() {
-		if (m_coroutine) {
-			auto coroutine = m_coroutine;
-			m_coroutine = nullptr;
-			coroutine.resume();
-		}
-    }
-
-
-private:
+    ITask* m_task;
     ImplType m_impl;
-    std::coroutine_handle<> m_coroutine;
-    nd::Worker* m_from_worker = nullptr;
 
-    std::source_location m_suspend_location;
+    nd::SrcId m_src_id;
+    uint32_t m_resume_key;
 };
 }  // namespace nd

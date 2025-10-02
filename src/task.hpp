@@ -1,14 +1,14 @@
-#include <atomic>
+#include "log.hpp"
+#include "worker_manager.hpp"
+#include "worker_types.hpp"
+#include "interfaces.hpp"
+
 #include <coroutine>
 #include <iostream>
 #include <list>
 #include <tuple>
 #include <type_traits>
 #include <source_location>
-
-#include "log.hpp"
-#include "worker_manager.hpp"
-#include "worker_types.hpp"
 
 #ifdef _MSC_VER
 #define NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
@@ -17,29 +17,9 @@
 #endif
 
 namespace nd {
-struct Empty {};
-template <bool exists, class T>
-using Maybe = std::conditional_t<exists, T, Empty>;
-
-template <typename ReturnType>
-class BaseTask;
 
 template <typename ReturnType>
 class Task;
-
-template <typename T>
-class ID {
-public:
-    ID() : m_id(++s_id) {}
-    operator size_t() const { return m_id; }
-    size_t Id() const { return m_id; }
-
-private:
-    static std::atomic<size_t> s_id;
-    size_t m_id;
-};
-template <typename T>
-std::atomic<size_t> ID<T>::s_id = 0;
 
 //-----------------------------------------
 // Control the lifetime of the task and coroutine
@@ -108,56 +88,85 @@ private:
 
 static_assert(sizeof(CoroutineController<void>) != sizeof(CoroutineController<char>));
 
+
 template <typename ReturnType = void>
-class BaseTask {
+class BaseTask : public ITask {
 public:
     friend class CoroutineController<ReturnType>;
     using CorotineControllerSharedPtr = std::shared_ptr<CoroutineController<ReturnType>>;
 
-    BaseTask(CorotineControllerSharedPtr& _controller, const char* _stat_name, const std::source_location& _loc) 
+    BaseTask(CorotineControllerSharedPtr& _controller) 
         : m_controller(_controller)
-        , m_running_worker(nullptr) 
-        , m_run_location(_loc)
-        , m_stat_name(_stat_name)
+        , m_worker(nullptr) 
+        , m_waiter(nullptr)
+        , m_resume_key((uint32_t)time(nullptr))
     {}
     virtual ~BaseTask() {}
 
+    /****
+     * The task is started in a new job which is a new running context.
+     * So it has no impact on the current running task.
+     */
     void BaseRunOnProcessor(int _worker_group_id = PreDefWorkerGroup::Current, const SessionId _the_id = 0) {
-        if (m_running_worker != nullptr) {
+        if (m_worker != nullptr) {
             // LOG_WARN("task can't run twice");
             return;
         }
 
-        m_running_worker = g_worker_mgr->GetWorker(_worker_group_id, _the_id);
-        BaseResume();
+        m_worker = g_worker_mgr->GetWorker(_worker_group_id, _the_id);
+        BaseResume(true);
     }
 
-    void BaseResume() {
-        if (m_running_worker == nullptr) { return; }
-
-        auto controller = m_controller;
-        auto id = m_id.Id();
-        m_running_worker->AddJob(new nd::Job{[controller, id]() {
-            if (!controller) { return; }
-            LOG_TRACE("task-" << id << " run in worker");
-            controller->Handle().resume();
-        }});
+    virtual void Resume(IWaiter* waiter, uint32_t resume_key) override { 
+        if (waiter != m_waiter || resume_key != m_resume_key)
+        { 
+            FLOG_FATAL("resume task from wrong waiter. suspended from [%p:%d], resumed from [%p:%d]", m_waiter, m_resume_key, waiter, resume_key);
+            abort();
+            return;
+        }
+        m_waiter = nullptr;
+        BaseResume(false);
     }
 
-    void WaitReturn(Worker* _worker) { m_controller->AddWaitingTask(this, _worker); }
+    virtual uint32_t GetResumeKey(IWaiter* waiter) override { 
+        assert(m_waiter == nullptr);
+        m_waiter = waiter;
+        m_resume_key = m_resume_key * 1103515245 + 12345;
+        return m_resume_key;
+    }
 
-    virtual void OnCoroutineReturn() {}
+    void WaitReturn(Worker* _worker) { 
+        m_controller->AddWaitingTask(this, _worker); 
+    }
+
+    virtual void OnCoroutineReturn() {
+    }
 
     bool IsDone() const { return m_controller->IsDone(); }
 
 protected:
-    ID<BaseTask<Empty>> m_id;
 
+    void BaseResume(bool _first_time){
+        if (m_worker == nullptr) { return; }
+
+        m_worker->AddJob(new nd::Job{[this, _first_time]() {
+            if (!m_controller) { return; }
+            if (_first_time) { 
+				LOG_TRACE("task-" << m_id << " run in worker");
+                Worker::GetCurrentWorker()->OnTaskStart(this);
+            } else {
+				LOG_TRACE("task-" << m_id << " resume in worker");
+                Worker::GetCurrentWorker()->OnTaskRun(this); 
+            }
+            m_controller->Handle().resume();
+        }});
+    }
+
+protected:
     CorotineControllerSharedPtr m_controller;
-    nd::Worker* m_running_worker;
-
-    std::source_location m_run_location;
-    const char* m_stat_name;
+    nd::Worker* m_worker;
+    IWaiter* m_waiter;
+    uint32_t m_resume_key;
 };
 
 //-----------------------------------------
@@ -196,6 +205,7 @@ public:
         LOG_TRACE("promise-" << m_id << " return value&");
         m_controller->SaveResult(_value);
         m_controller->OnCoroutineReturn();
+		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
 
     // NOLINTNEXTLINE
@@ -203,6 +213,7 @@ public:
         LOG_TRACE("promise-" << m_id << " return value&&");
         m_controller->SaveResult(_value);
         m_controller->OnCoroutineReturn();
+		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
 
     // NOLINTNEXTLINE
@@ -210,6 +221,7 @@ public:
         LOG_TRACE("promise-" << m_id << " unhandled exception");
         m_controller->SaveException(std::current_exception());
         m_controller->OnCoroutineReturn();
+		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
 
 private:
@@ -254,6 +266,7 @@ public:
     void return_void() noexcept {
         LOG_TRACE("promise-" << m_id << " return void");
         m_controller->OnCoroutineReturn();
+		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
 
     // NOLINTNEXTLINE
@@ -261,6 +274,7 @@ public:
         LOG_TRACE("promise-" << m_id << " unhandled exception");
         m_controller->SaveException(std::current_exception());
         m_controller->OnCoroutineReturn();
+		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
 
 private:
@@ -269,20 +283,21 @@ private:
 };
 
 template <typename ReturnType = void>
-class Task : public BaseTask<ReturnType> {
+class Task : public BaseTask<ReturnType>, IWaiter {
 public:
     using promise_type = TaskPromise<ReturnType>;  // NOLINT
     using CorotineControllerSharedPtr = std::shared_ptr<CoroutineController<ReturnType>>;
     using ParentTask = BaseTask<ReturnType>;
 
-    Task(CorotineControllerSharedPtr& _controller, const char* _stat_name = nullptr, const std::source_location& _loc = std::source_location::current()) 
-        : ParentTask(_controller, _stat_name, _loc)
+    Task(CorotineControllerSharedPtr& _controller) 
+        : ParentTask(_controller)
     {
         LOG_TRACE("task-" << ParentTask::m_id << " created");
     }
     virtual ~Task() { LOG_TRACE("task-" << ParentTask::m_id << " destroyed"); }
 
-    Task& RunOnProcessor(int _worker_group_id = PreDefWorkerGroup::Current, const SessionId _the_id = 0) {
+    Task& RunOnProcessor(int _worker_group_id = PreDefWorkerGroup::Current, const SessionId _the_id = 0, const char* _stat_name = nullptr, const std::source_location& _loc = std::source_location::current()) {
+        ITask::SetStatInfo(_stat_name, _loc);
         ParentTask::BaseRunOnProcessor(_worker_group_id, _the_id);
         return *this;
     }
@@ -292,11 +307,16 @@ public:
     // NOLINTNEXTLINE
     void await_suspend(std::coroutine_handle<> _awaiting_coroutine) noexcept {
         m_parent_coroutine_controller = _awaiting_coroutine;
+        auto worker = Worker::GetCurrentWorker();
+        m_suspended_task = worker->GetCurrentRunningTask();
         ParentTask::WaitReturn(Worker::GetCurrentWorker());
+        Worker::GetCurrentWorker()->OnTaskSuspend(this);
     }
     virtual void OnCoroutineReturn() override {
         ParentTask::OnCoroutineReturn();
 
+		Worker::GetCurrentWorker()->OnTaskRun(m_suspended_task); 
+        m_suspended_task = nullptr;
         m_parent_coroutine_controller.resume();
     }
 
@@ -320,6 +340,7 @@ public:
 
 private:
     std::coroutine_handle<> m_parent_coroutine_controller;
+    ITask* m_suspended_task;
 };
 
 template <typename ReturnType>
