@@ -149,7 +149,7 @@ private:
                   info.tm_sec,                                                          \
                   ms_time_left,                                                         \
                   g_loglevel_str[level],                                                \
-                  nd::Worker::GetCurrWorkerName(),                                      \
+                  get_current_worker_name(),                                            \
                   filename,                                                             \
                   __LINE__,                                                             \
                   ##__VA_ARGS__);                                                       \
