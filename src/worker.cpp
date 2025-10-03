@@ -1,7 +1,5 @@
 #include "worker.hpp"
 
-#include <assert.h>
-
 #include "log.hpp"
 #include "min_heap.h"
 #include "task.hpp"
@@ -16,7 +14,13 @@ thread_local int Worker::s_current_worker_group_id = PreDefWorkerGroup::Invalid;
 thread_local int Worker::s_current_worker_id = 0;
 thread_local char Worker::s_worker_name[MAX_WORKER_NAME_LEN] = "";
 
+
 //-----------------------------------------------------------------------------
+
+const char* get_current_worker_name() { return nd::Worker::GetCurrWorkerName(); }
+
+//-----------------------------------------------------------------------------
+
 Worker::Worker()
     : m_worker_group_id(PreDefWorkerGroup::Invalid),
       m_worker_id(0),
@@ -31,8 +35,8 @@ Worker::Worker()
 //-----------------------------------------------------------------------------
 
 Worker::~Worker() {
-    assert(IsJobQueueEmpty());              // jobs should be empty for a elegant exit!
-    assert(min_heap_empty(&m_timer_heap));  // timer heap shoude be empty for a elegant exit!
+    MY_ASSERT(IsJobQueueEmpty(), "jobs should be empty for an elegant exit!");
+    MY_ASSERT(min_heap_empty(&m_timer_heap), "timer heap should be empty for an elegant exit!");
     min_heap_dtor(&m_timer_heap);
 }
 
@@ -172,7 +176,7 @@ void Worker::InternalStep() {
     auto next_duration = HandleLocalTimer();
 
     // end of handling
-    assert(m_current_running_task == nullptr);
+    MY_ASSERT(m_current_running_task == nullptr, "The running task must either in exit or await, thus must be null here.");
 
     unique_lock<mutex> queue_lock(m_queue_mutex);
     if (!m_job_queue.empty()) { return; }
@@ -185,17 +189,18 @@ void Worker::InternalStep() {
 //-----------------------------------------------------------------------------
 
 void Worker::Step() {
-    assert(std::this_thread::get_id() == s_current_thread_id);
+    MY_ASSERT(std::this_thread::get_id() == s_current_thread_id, "step can only be run in the worker thread!");
     InternalStep();
 }
 
 //-----------------------------------------------------------------------------
 
 void Worker::OnTaskStart(ITask* _task) { 
-	assert(_task);
+	MY_ASSERT(_task, "input task can't be null!");
+    MY_ASSERT(m_current_running_task == nullptr, "There is another task running, new task must be run in a new job.");
 
     auto task_id = _task->Id();
-    assert(m_tasks.find(task_id) == m_tasks.end());
+	MY_ASSERT(m_tasks.find(task_id) == m_tasks.end(), "task can't be start twice in the same time");
     m_tasks[task_id] = _task;
 
 	OnTaskRun(_task);
@@ -204,24 +209,24 @@ void Worker::OnTaskStart(ITask* _task) {
 //-----------------------------------------------------------------------------
 
 void Worker::OnTaskRun(ITask* _task) { 
-    assert(m_current_running_task == nullptr);
+    MY_ASSERT(m_current_running_task == nullptr, "There is another task running, new task must be run in a new job.");
     m_current_running_task = _task; 
 }
 
 //-----------------------------------------------------------------------------
 
 void Worker::OnTaskSuspend(IWaiter* _waiter) { 
-    assert(m_current_running_task != nullptr);
+    MY_ASSERT(m_current_running_task != nullptr, "There is no task running?!");
     m_current_running_task = nullptr; 
 }
 
 //-----------------------------------------------------------------------------
 
 void Worker::OnTaskEnd() { 
-    assert(m_current_running_task != nullptr);
+    MY_ASSERT(m_current_running_task != nullptr, "no running task");
 
     auto it = m_tasks.find(m_current_running_task->Id());
-    assert(it != m_tasks.end());
+    MY_ASSERT(it != m_tasks.end(), "task-%lld is not running?!", m_current_running_task->Id());
 
     m_tasks.erase(it);
     m_current_running_task = nullptr; 

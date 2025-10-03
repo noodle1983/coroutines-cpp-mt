@@ -1,5 +1,5 @@
-#ifndef LOG_H
-#define LOG_H
+#ifndef LOG_HPP
+#define LOG_HPP
 
 /********************
  * synchronized log for test purpose,
@@ -20,7 +20,8 @@
 #include <thread>
 
 #include "singleton.hpp"
-#include "worker.hpp"
+
+const char* get_current_worker_name();
 
 constexpr int64_t MILLISECONDS_PER_SECOND = 1000;
 
@@ -73,7 +74,7 @@ StreamType& FormatLogPrefix(StreamType& _os, const char* _level_str, const char*
     strftime(time_str, TIME_STR_LEN, "%Y-%m-%d %H:%M:%S", &info);
 
     _os << time_str << '.' << std::setfill('0') << std::setw(3) << ms_time_left << " " << _level_str
-        << nd::Worker::GetCurrWorkerName() << "(" << _file << ":" << _lineno << ") ";
+        << get_current_worker_name() << "(" << _file << ":" << _lineno << ") ";
     return _os;
 }
 
@@ -170,4 +171,11 @@ private:
 #define FLOG_ERROR(fmt, ...) FMT_LOG(printf, ((int)LogLevel::ERROR), true, fmt, ##__VA_ARGS__)
 #define FLOG_FATAL(fmt, ...) FMT_LOG(printf, ((int)LogLevel::FATAL), true, fmt, ##__VA_ARGS__)
 
-#endif
+#define MY_ASSERT(cond, fmt, ...)                                          \
+    if (!(cond)) {                                                         \
+        FMT_LOG(printf, ((int)LogLevel::FATAL), true, fmt, ##__VA_ARGS__); \
+        abort();                                                           \
+    }
+
+
+#endif /*LOG_HPP*/

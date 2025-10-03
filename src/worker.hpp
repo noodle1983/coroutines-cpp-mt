@@ -1,10 +1,10 @@
 #ifndef WORKER_H
 #define WORKER_H
 
+#include "log.hpp"
 #include <min_heap.h>
 
 #include <atomic>
-#include <cassert>
 #include <condition_variable>
 #include <functional>
 #include <list>
@@ -25,7 +25,7 @@ public:
 
     void Init(int _worker_group_id, int _worker_id, int _thread_num, std::string& _group_name) {
         // init once only
-        assert(m_worker_group_id == PreDefWorkerGroup::Invalid);
+        MY_ASSERT(m_worker_group_id == PreDefWorkerGroup::Invalid, "worker must have a valid group id.");
 
         m_worker_group_id = _worker_group_id;
         m_worker_id = _worker_id;
@@ -44,7 +44,7 @@ public:
 
     static void MarkMainThread() {
         // init once only
-        assert(s_current_worker_group_id == PreDefWorkerGroup::Invalid);
+        MY_ASSERT(s_current_worker_group_id == PreDefWorkerGroup::Invalid, "main thread can not be marked twice.");
 
         s_current_thread_id = std::this_thread::get_id();
         s_current_worker_group_id = PreDefWorkerGroup::Main;
@@ -53,17 +53,17 @@ public:
         snprintf(s_worker_name, sizeof(s_worker_name) - 1, "[main]");
     }
     static Worker* GetMainWorker() {
-        assert(std::this_thread::get_id() == s_current_thread_id);
+        MY_ASSERT(std::this_thread::get_id() == s_current_thread_id, "GetMainWorker can only be run in main thread!");
         // a complete worker object but no thread context
         // had to run step() in main to run all the jobs in the queue
         return Singleton<Worker, 0>::Instance();
     }
     static Worker* GetCurrentWorker() {
-        assert(s_current_worker != nullptr);
+        MY_ASSERT(s_current_worker != nullptr, "current worker can't be null.");
         return s_current_worker;
     }
     static const char* GetCurrWorkerName() {
-        assert(s_current_worker != nullptr);
+        MY_ASSERT(s_current_worker != nullptr, "current worker can't be null.");
         return s_worker_name;
     }
 

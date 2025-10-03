@@ -47,7 +47,7 @@ public:
         auto worker = Worker::GetCurrentWorker();
         m_task = worker->GetCurrentRunningTask();
 
-        assert(m_task != nullptr);
+        MY_ASSERT(m_task != nullptr, "must await in a task!");
         m_resume_key = m_task->GetResumeKey(this);
 
         m_impl.AwaitSuspend();
@@ -64,7 +64,7 @@ public:
     }
 
     void Resume() { 
-        assert(m_task != nullptr);
+        MY_ASSERT(m_task != nullptr, "not await yet!");
         m_task->Resume(this, m_resume_key);
         m_resume_key = 0;
     }

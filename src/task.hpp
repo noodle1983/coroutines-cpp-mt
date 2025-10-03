@@ -129,7 +129,7 @@ public:
     }
 
     virtual uint32_t GetResumeKey(IWaiter* waiter) override { 
-        assert(m_waiter == nullptr);
+        MY_ASSERT(m_waiter == nullptr, "waiter can't be null!");
         m_waiter = waiter;
         m_resume_key = m_resume_key * 1103515245 + 12345;
         return m_resume_key;
