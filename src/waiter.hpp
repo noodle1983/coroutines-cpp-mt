@@ -1,13 +1,21 @@
 #pragma once
 
-#include <coroutine>
-#include <source_location>
-
 #include "worker.hpp"
 #include "log.hpp"
 #include "interfaces.hpp"
 
+#include <coroutine>
+#include <source_location>
+#include <type_traits>
+
 namespace nd {
+
+
+template<typename ImplType>
+class TaskInnerWaiter;
+
+template<typename Impl, typename... Args>
+struct is_constructible_with_waiter : std::is_constructible<Impl, TaskInnerWaiter<Impl>*, Args...> {};
 
 // It records only one coroutine handle, so it can be used in only one coroutine at a time.
 /*
@@ -29,9 +37,27 @@ public:
         : m_task(nullptr), m_src_id(_loc), m_resume_key(0)
     {}
 
-    template<typename Arg0>
+    template<typename Arg0,
+             typename = std::enable_if_t<
+                 is_constructible_with_waiter<ImplType, Arg0>::value>>
     TaskInnerWaiter(Arg0 _arg0, const std::source_location& _loc = std::source_location::current()) 
-        : m_impl(this, _arg0), m_src_id(_loc) {}
+        : m_impl(this, _arg0), 
+          m_src_id(_loc), 
+          m_resume_key(0) 
+    {}
+
+    template<typename... Args,
+             typename = std::enable_if_t<
+                 is_constructible_with_waiter<ImplType, Args...>::value>>
+    TaskInnerWaiter(Args&&... _args, 
+                   const std::source_location& _loc = std::source_location::current()) 
+        : m_impl(this, std::forward<Args>(_args)...), 
+          m_src_id(_loc), 
+          m_resume_key(0) 
+    {}
+    //template<typename Arg0>
+    //TaskInnerWaiter(Arg0 _arg0, const std::source_location& _loc = std::source_location::current()) 
+    //    : m_impl(this, _arg0), m_src_id(_loc) {}
     //template<typename... Args>
     //TaskInnerWaiter(Args&&... _args, const std::source_location& _loc = std::source_location::current()) 
     //    : m_impl(this, std::forward<Args>(_args)...), m_coroutine(nullptr), m_from_worker(nullptr), m_suspend_location(_loc) {}

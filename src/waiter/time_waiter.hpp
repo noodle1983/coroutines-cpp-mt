@@ -50,4 +50,15 @@ private:
     TimerHandle m_timer_handle;
 };
 using TimeWaiter = TimeWrappedWaiter::WaiterType;
+
 }  // namespace nd
+
+// can't get the right location for this usage
+// inline nd::TimeWrappedWaiter::WaiterType operator"" _ms(unsigned long long milliseconds) {
+//     return nd::TimeWrappedWaiter::WaiterType(static_cast<uint64_t>(milliseconds));
+// }
+// 
+// inline nd::TimeWrappedWaiter::WaiterType operator"" _s(unsigned long long seconds) {
+//     return nd::TimeWrappedWaiter::WaiterType(static_cast<uint64_t>(seconds * 1000));
+// }
+
