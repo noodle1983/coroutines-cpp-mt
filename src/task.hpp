@@ -97,7 +97,7 @@ public:
         , m_worker(nullptr) 
         , m_waiter(nullptr)
         , m_resume_key((uint32_t)time(nullptr))
-    {}
+    { LOG_TRACE(*this << " created"); }
     virtual ~BaseTask() {}
 
     /****
@@ -139,10 +139,10 @@ protected:
         m_worker->AddJob(new nd::Job{[this, _first_time]() {
             if (!m_as_waiter_impl) { return; }
             if (_first_time) { 
-				LOG_TRACE("task-" << m_id << " run in worker");
+				LOG_TRACE(*this << " run");
                 Worker::GetCurrentWorker()->OnTaskStart(this);
             } else {
-				LOG_TRACE("task-" << m_id << " resume in worker");
+				LOG_TRACE(*this << " resume");
                 Worker::GetCurrentWorker()->OnTaskRun(this); 
             }
             m_my_handle.resume();
@@ -166,20 +166,18 @@ public:
 
     TaskPromise() noexcept 
         : m_as_waiter_impl(new WrappedTaskWaiter<ReturnType>())
-    {
-        LOG_TRACE("promise-" << m_id << " created");
-    }
-    virtual ~TaskPromise() { LOG_TRACE("promise-" << m_id << " destroyed"); }
+    { LOG_TRACE(*this << " created"); }
+    virtual ~TaskPromise() { LOG_TRACE(*this << " destroyed"); }
 
     // NOLINTNEXTLINE
     auto initial_suspend() noexcept {
-        LOG_TRACE("promise-" << m_id << " inital_suspend");
+        LOG_TRACE(*this << " inital_suspend");
         return std::suspend_always{};
     }
 
     // NOLINTNEXTLINE
     auto final_suspend() noexcept {
-        LOG_TRACE("promise-" << m_id << " final_suspend");
+        LOG_TRACE(*this << " final_suspend");
         return std::suspend_never{};
     }
 
@@ -188,7 +186,7 @@ public:
 
     // NOLINTNEXTLINE
     void return_value(const ReturnType& _value) noexcept {
-        LOG_TRACE("promise-" << m_id << " return value&");
+        LOG_TRACE(*this << " return value&");
         m_as_waiter_impl->SaveResult(_value);
         m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
@@ -196,7 +194,7 @@ public:
 
     // NOLINTNEXTLINE
     void return_value(ReturnType&& _value) noexcept {
-        LOG_TRACE("promise-" << m_id << " return value&&");
+        LOG_TRACE(*this << " return value&&");
         m_as_waiter_impl->SaveResult(_value);
         m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
@@ -204,11 +202,16 @@ public:
 
     // NOLINTNEXTLINE
     void unhandled_exception() noexcept {
-        LOG_TRACE("promise-" << m_id << " unhandled exception");
+        LOG_TRACE(*this << " unhandled exception");
         m_as_waiter_impl->SaveException(std::current_exception());
         m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
+
+    friend std::ostream& operator<<(std::ostream& os, const TaskPromise<ReturnType>& obj) {
+        os << "promise<R>-" << obj.m_id;
+		return os;
+	}
 
 private:
     WaiterImplPtr m_as_waiter_impl;
@@ -226,20 +229,18 @@ public:
 
     TaskPromise() noexcept 
         : m_as_waiter_impl(new WrappedTaskWaiter<void>())
-    {
-        LOG_TRACE("promise-" << m_id << " created");
-    }
-    virtual ~TaskPromise() { LOG_TRACE("promise-" << m_id << " destroyed"); }
+    { LOG_TRACE(*this << " created"); }
+    virtual ~TaskPromise() { LOG_TRACE(*this << " destroyed"); }
 
     // NOLINTNEXTLINE
     auto initial_suspend() noexcept {
-        LOG_TRACE("promise-" << m_id << " inital_suspend");
+        LOG_TRACE(*this << " inital_suspend");
         return std::suspend_always{};
     }
 
     // NOLINTNEXTLINE
     auto final_suspend() noexcept {
-        LOG_TRACE("promise-" << m_id << " final_suspend");
+        LOG_TRACE(*this << " final_suspend");
         return std::suspend_never{};
     }
 
@@ -248,18 +249,23 @@ public:
 
     // NOLINTNEXTLINE
     void return_void() noexcept {
-        LOG_TRACE("promise-" << m_id << " return void");
+        LOG_TRACE(*this << " return void");
         m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
 
     // NOLINTNEXTLINE
     void unhandled_exception() noexcept {
-        LOG_TRACE("promise-" << m_id << " unhandled exception");
+        LOG_TRACE(*this << " unhandled exception");
         m_as_waiter_impl->SaveException(std::current_exception());
         m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
+
+    friend std::ostream& operator<<(std::ostream& os, const TaskPromise<void>& obj) {
+        os << "promise<>-" << obj.m_id;
+		return os;
+	}
 
 private:
     WaiterImplPtr m_as_waiter_impl;
@@ -280,7 +286,6 @@ public:
         , ParentWaiter(_as_waiter_impl, std::source_location::current())
     {
         _as_waiter_impl->SetWaiter(this);
-        LOG_TRACE("task-" << ParentTask::m_id << " created");
     }
     virtual ~Task() { LOG_TRACE("task-" << ParentTask::m_id << " destroyed"); }
 
@@ -300,12 +305,12 @@ private:
 
 template <typename ReturnType>
 Task<ReturnType> TaskPromise<ReturnType>::get_return_object() noexcept {
-    LOG_TRACE("promise-" << m_id << " get_return_object");
+    LOG_TRACE(*this << " get_return_object");
     return Task<ReturnType>(m_as_waiter_impl, std::coroutine_handle<TaskPromise>::from_promise(*this));
 }
 
 inline Task<void> TaskPromise<void>::get_return_object() noexcept {
-    LOG_TRACE("promise-" << m_id << " get_return_object");
+    LOG_TRACE(*this << " get_return_object");
     return Task<void>(m_as_waiter_impl, std::coroutine_handle<TaskPromise>::from_promise(*this));
 }
 }  // namespace nd

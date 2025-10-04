@@ -39,7 +39,7 @@ public:
         m_stat_name = _stat_name;
     }
 
-    void GetStatId(char* _buff, size_t _buff_len) {
+    void GetStatId(char* _buff, size_t _buff_len) const {
         if (m_stat_name) {
             snprintf(_buff, _buff_len - 1, "%s", m_stat_name);
         } else {
@@ -49,6 +49,13 @@ public:
 
     virtual void Resume(IWaiter* waiter, uint32_t resume_key) = 0;
     virtual uint32_t GetResumeKey(IWaiter* waiter) = 0;
+
+    friend std::ostream& operator<<(std::ostream& os, const ITask& obj) {
+        char buff[128] = {0};
+        obj.GetStatId(buff, sizeof(buff));
+        os << "task-" << obj.m_id << '[' << buff << ']';
+		return os;
+	}
 
 protected:
     ID<BaseTask<Empty>> m_id;

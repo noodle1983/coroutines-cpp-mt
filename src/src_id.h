@@ -26,7 +26,7 @@ public:
         }
     }
 
-    void Get(char* _buff, size_t _len) {
+    void Get(char* _buff, size_t _len) const {
         snprintf(_buff, _len, "%s:%d", m_filename, m_line);
     }
 

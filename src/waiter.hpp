@@ -103,6 +103,13 @@ public:
         m_resume_key = 0;
     }
 
+    friend std::ostream& operator<<(std::ostream& os, const TaskInnerWaiter<ImplType>& obj) {
+        char buff[128] = {0};
+        obj.m_src_id.Get(buff, sizeof(buff));
+        os << "InnerWaiter[" << buff << ']';
+		return os;
+	}
+
 private:
     ITask* m_task;
     ImplType m_impl;
@@ -208,6 +215,13 @@ public:
         }
         m_tasks_info.clear();
     }
+
+    friend std::ostream& operator<<(std::ostream& os, const TaskInnerWaiter<ImplType>& obj) {
+        char buff[128] = {0};
+        obj.m_src_id.Get(buff, sizeof(buff));
+        os << "GenWaiter[" << buff << ']';
+		return os;
+	}
 
 private:
     std::map<ITask*, uint32_t> m_tasks_info;

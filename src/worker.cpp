@@ -12,7 +12,6 @@ thread_local Worker* Worker::s_current_worker = nullptr;
 thread_local std::thread::id Worker::s_current_thread_id;
 thread_local int Worker::s_current_worker_group_id = PreDefWorkerGroup::Invalid;
 thread_local int Worker::s_current_worker_id = 0;
-thread_local char Worker::s_worker_name[MAX_WORKER_NAME_LEN] = "";
 
 
 //-----------------------------------------------------------------------------
@@ -136,16 +135,6 @@ void Worker::ThreadMain() {
     s_current_thread_id = std::this_thread::get_id();
     s_current_worker_group_id = m_worker_group_id;
     s_current_worker_id = m_worker_id;
-    if (m_worker_num > 1) {
-        snprintf(s_worker_name,
-                 MAX_WORKER_NAME_LEN - 1,
-                 "[%s %d/%d]",
-                 m_worker_group_name.c_str(),
-                 m_worker_id,
-                 m_worker_num);
-    } else {
-        snprintf(s_worker_name, MAX_WORKER_NAME_LEN - 1, "[%s]", m_worker_group_name.c_str());
-    }
     LOG_TRACE("worker start");
 
     while (!m_is_to_stop && !(m_is_wait_stop && IsJobQueueEmpty())) { InternalStep(); }

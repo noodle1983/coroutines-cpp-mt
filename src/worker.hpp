@@ -31,6 +31,11 @@ public:
         m_worker_id = _worker_id;
         m_worker_num = _thread_num;
         m_worker_group_name = _group_name;
+		if (m_worker_num > 1) {
+			snprintf(m_worker_name, MAX_WORKER_NAME_LEN - 1, "[%s %d/%d]", m_worker_group_name.c_str(), m_worker_id, m_worker_num);
+		} else {
+			snprintf(m_worker_name, MAX_WORKER_NAME_LEN - 1, "[%s]", m_worker_group_name.c_str());
+		}
     }
 
     bool IsJobQueueEmpty() {
@@ -50,7 +55,7 @@ public:
         s_current_worker_group_id = PreDefWorkerGroup::Main;
         s_current_worker_id = 0;
         s_current_worker = GetMainWorker();
-        snprintf(s_worker_name, sizeof(s_worker_name) - 1, "[main]");
+        snprintf(s_current_worker->m_worker_name, sizeof(s_current_worker->m_worker_name) - 1, "[main]");
     }
     static Worker* GetMainWorker() {
         MY_ASSERT(std::this_thread::get_id() == s_current_thread_id, "GetMainWorker can only be run in main thread!");
@@ -64,7 +69,7 @@ public:
     }
     static const char* GetCurrWorkerName() {
         MY_ASSERT(s_current_worker != nullptr, "current worker can't be null.");
-        return s_worker_name;
+        return GetCurrentWorker()->m_worker_name;
     }
 
     void Stop();
@@ -88,18 +93,23 @@ public:
     void OnTaskEnd();
     ITask* GetCurrentRunningTask() { return m_current_running_task; }
 
+    friend std::ostream& operator<<(std::ostream& os, const Worker& obj) {
+        os << obj.m_worker_name;
+		return os;
+	}
+
 private:
     void InternalStep();
     thread_local static Worker* s_current_worker;
     thread_local static std::thread::id s_current_thread_id;
     thread_local static int s_current_worker_group_id;
     thread_local static int s_current_worker_id;
-    thread_local static char s_worker_name[MAX_WORKER_NAME_LEN];
 
     int m_worker_group_id;
     int m_worker_id;
     int m_worker_num;
     std::string m_worker_group_name;
+    char m_worker_name[MAX_WORKER_NAME_LEN];
 
     JobQueue m_job_queue;
     std::mutex m_queue_mutex;
