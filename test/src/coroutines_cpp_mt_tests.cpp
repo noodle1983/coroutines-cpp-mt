@@ -51,23 +51,19 @@ protected:
 
 TEST_F(CoroutinesCppMtTest, TypeSize) {
     LOG_TRACE("----------------------------------------");
-    LOG_TRACE("sizeof nd::CoroutineController<void> = " << sizeof(nd::CoroutineController<void>));
-    LOG_TRACE("\tsizeof nd::ID<CoroutineController<void>> = " << sizeof(nd::ID<nd::CoroutineController<void>>));
-    LOG_TRACE("\tsizeof std::list<CoroutineController<void>::WaitingTask> = "
-              << sizeof(std::list<nd::CoroutineController<void>::WaitingTask>));
+    LOG_TRACE("sizeof nd::WrappedTaskWaiter<void> = " << sizeof(nd::WrappedTaskWaiter<void>));
+    LOG_TRACE("\tsizeof nd::ID<WrappedTaskWaiter<void>> = " << sizeof(nd::ID<nd::WrappedTaskWaiter<void>>));
     LOG_TRACE("\tsizeof std::mutex = " << sizeof(std::mutex));
     LOG_TRACE("\tsizeof std::coroutine_handle<> = " << sizeof(std::coroutine_handle<>));
     LOG_TRACE("----------------------------------------");
-    LOG_TRACE("sizeof nd::CoroutineController<char> = " << sizeof(nd::CoroutineController<char>));
-    LOG_TRACE("\tsizeof nd::ID<CoroutineController<char>> = " << sizeof(nd::ID<nd::CoroutineController<char>>));
-    LOG_TRACE("\tsizeof std::list<CoroutineController<char>::WaitingTask> = "
-              << sizeof(std::list<nd::CoroutineController<char>::WaitingTask>));
+    LOG_TRACE("sizeof nd::WrappedTaskWaiter<char> = " << sizeof(nd::WrappedTaskWaiter<char>));
+    LOG_TRACE("\tsizeof nd::ID<WrappedTaskWaiter<char>> = " << sizeof(nd::ID<nd::WrappedTaskWaiter<char>>));
     LOG_TRACE("\tsizeof std::mutex = " << sizeof(std::mutex));
     LOG_TRACE("\tsizeof std::coroutine_handle<> = " << sizeof(std::coroutine_handle<>));
     LOG_TRACE("\tsizeof char = " << sizeof(char));
     LOG_TRACE("----------------------------------------");
-    EXPECT_EQ(sizeof(nd::CoroutineController<void>) + sizeof(size_t), sizeof(nd::CoroutineController<char>));
-    EXPECT_EQ(sizeof(nd::CoroutineController<void>) + sizeof(size_t), sizeof(nd::CoroutineController<size_t>));
+    EXPECT_EQ(sizeof(nd::WrappedTaskWaiter<void>), sizeof(nd::WrappedTaskWaiter<char>));
+    EXPECT_EQ(sizeof(nd::WrappedTaskWaiter<void>) + sizeof(size_t), sizeof(nd::WrappedTaskWaiter<size_t>));
 }
 
 TEST_F(CoroutinesCppMtTest, Wait_Bg_Task_On_Main_Thread) {

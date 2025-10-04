@@ -2,6 +2,7 @@
 #include "worker_manager.hpp"
 #include "worker_types.hpp"
 #include "interfaces.hpp"
+#include "waiter.hpp"
 
 #include <coroutine>
 #include <iostream>
@@ -20,40 +21,37 @@ namespace nd {
 
 template <typename ReturnType>
 class Task;
+template <typename ReturnType>
+class TaskPromise;
 
-//-----------------------------------------
-// Control the lifetime of the task and coroutine
-// If the return task is not holded in any where, it lives until the coroutine exits.
-// Otherwise, it lives until the last hold task is done.
-//-----------------------------------------
-template <typename ReturnType = void>
-class CoroutineController {
+/**
+ * a task is a suspend-able function and also a waiter which suspends the upper task.
+ * WrappedTaskWaiter make the task acts as a waiter. 
+ * And it is copyable and is co-await in different tasks among different workers.
+ * ref to waiter.hpp and GeneralWaiter
+ */
+template <typename ReturnType>
+class WrappedTaskWaiter
+{
 public:
-    using WaitingTask = std::tuple<BaseTask<ReturnType>*, Worker*>;
-
-    CoroutineController(std::coroutine_handle<> _coroutine) : m_coroutine(_coroutine) {
-        LOG_TRACE("controller-" << m_id << " created");
+	using WaiterType = GeneralWaiter<WrappedTaskWaiter<ReturnType>>;
+	using RetType = ReturnType; // return type of await_resume
+    WrappedTaskWaiter() : m_waiter(nullptr), m_is_done(false){ 
+        LOG_TRACE(*this << " created.");
     }
-    virtual ~CoroutineController() {
-        if (m_coroutine) {
-            m_coroutine.destroy();
-            m_coroutine = nullptr;
-        }
-        LOG_TRACE("controller-" << m_id << " destroyed");
-    }
+	void SetWaiter(WaiterType* _waiter) { m_waiter = _waiter; }
+    WrappedTaskWaiter(WrappedTaskWaiter&) = delete;
+	virtual ~WrappedTaskWaiter(){}
 
-    // please make sure the handle is valid before use it
-    // it is only used in resume
-    std::coroutine_handle<> Handle() const { return m_coroutine; }
-
-    void AddWaitingTask(BaseTask<ReturnType>* _task, Worker* _worker);
-    void OnCoroutineReturn();
-    void OnCoroutineDone();
-
-    bool IsDone() {
-        std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
-        return m_coroutine == nullptr;
-    }
+	bool AwaitReady() { return m_is_done; }
+	void AwaitSuspend(){}
+	void ResumeUpperTask() { m_waiter->Resume(); }
+	void SetDone() {
+		LOG_TRACE(*this << " done");
+		m_is_done = true;
+		ResumeUpperTask();
+	}
+	bool IsDone() { return m_is_done; }
 
     template <typename CheckType = ReturnType>
     void SaveResult(typename std::enable_if_t<!std::is_void_v<CheckType>, const ReturnType>& _value) {
@@ -64,7 +62,7 @@ public:
         m_result = _value;
     };
     template <typename CheckType = ReturnType>
-    typename std::enable_if_t<!std::is_void_v<CheckType>, const ReturnType>& GetResult() {
+    typename std::enable_if_t<!std::is_void_v<CheckType>, const ReturnType>& GetRetObj() {
         return m_result;
     };
 
@@ -74,29 +72,28 @@ public:
         if (m_exception) { std::rethrow_exception(m_exception); }
     }
 
-private:
-    ID<CoroutineController<Empty>> m_id;
+    friend std::ostream& operator<<(std::ostream& os, const WrappedTaskWaiter<ReturnType>& obj) {
+        os << "task-as-waiter-" << obj.m_id;
+		return os;
+	}
 
-    std::list<WaitingTask> m_waiting_tasks;
-    std::mutex m_waiting_tasks_mutex;
-
-    std::coroutine_handle<> m_coroutine;
-
+public:
+    WaiterType* m_waiter;
     NO_UNIQUE_ADDRESS Maybe<!std::is_void_v<ReturnType>, ReturnType> m_result;
+    std::atomic<bool> m_is_done;
     std::exception_ptr m_exception;
+    ID<WrappedTaskWaiter<Empty>> m_id;
 };
-
-static_assert(sizeof(CoroutineController<void>) != sizeof(CoroutineController<char>));
-
 
 template <typename ReturnType = void>
 class BaseTask : public ITask {
 public:
-    friend class CoroutineController<ReturnType>;
-    using CorotineControllerSharedPtr = std::shared_ptr<CoroutineController<ReturnType>>;
+    using promise_type = TaskPromise<ReturnType>;  // NOLINT
+    using WaiterImplPtr = std::shared_ptr<WrappedTaskWaiter<ReturnType>>;
 
-    BaseTask(CorotineControllerSharedPtr& _controller) 
-        : m_controller(_controller)
+    BaseTask(WaiterImplPtr& _as_waiter_impl, std::coroutine_handle<promise_type> _handle) 
+        : m_my_handle(_handle)
+        , m_as_waiter_impl(_as_waiter_impl)
         , m_worker(nullptr) 
         , m_waiter(nullptr)
         , m_resume_key((uint32_t)time(nullptr))
@@ -118,12 +115,9 @@ public:
     }
 
     virtual void Resume(IWaiter* waiter, uint32_t resume_key) override { 
-        if (waiter != m_waiter || resume_key != m_resume_key)
-        { 
-            FLOG_FATAL("resume task from wrong waiter. suspended from [%p:%d], resumed from [%p:%d]", m_waiter, m_resume_key, waiter, resume_key);
-            abort();
-            return;
-        }
+        MY_ASSERT (waiter == m_waiter && resume_key == m_resume_key,
+            "resume task from wrong waiter. suspended from [%p:%d], resumed from [%p:%d]", 
+            m_waiter, m_resume_key, waiter, resume_key);
         m_waiter = nullptr;
         BaseResume(false);
     }
@@ -135,14 +129,7 @@ public:
         return m_resume_key;
     }
 
-    void WaitReturn(Worker* _worker) { 
-        m_controller->AddWaitingTask(this, _worker); 
-    }
-
-    virtual void OnCoroutineReturn() {
-    }
-
-    bool IsDone() const { return m_controller->IsDone(); }
+    bool IsDone() const { return m_as_waiter_impl->IsDone(); }
 
 protected:
 
@@ -150,7 +137,7 @@ protected:
         if (m_worker == nullptr) { return; }
 
         m_worker->AddJob(new nd::Job{[this, _first_time]() {
-            if (!m_controller) { return; }
+            if (!m_as_waiter_impl) { return; }
             if (_first_time) { 
 				LOG_TRACE("task-" << m_id << " run in worker");
                 Worker::GetCurrentWorker()->OnTaskStart(this);
@@ -158,12 +145,13 @@ protected:
 				LOG_TRACE("task-" << m_id << " resume in worker");
                 Worker::GetCurrentWorker()->OnTaskRun(this); 
             }
-            m_controller->Handle().resume();
+            m_my_handle.resume();
         }});
     }
 
 protected:
-    CorotineControllerSharedPtr m_controller;
+    std::coroutine_handle<promise_type> m_my_handle;
+    WaiterImplPtr m_as_waiter_impl;
     nd::Worker* m_worker;
     IWaiter* m_waiter;
     uint32_t m_resume_key;
@@ -174,13 +162,12 @@ template <typename ReturnType>
 class TaskPromise {
 public:
     friend class Task<ReturnType>;
-    using CorotineControllerSharedPtr = std::shared_ptr<CoroutineController<ReturnType>>;
+    using WaiterImplPtr = std::shared_ptr<WrappedTaskWaiter<ReturnType>>;
 
-    TaskPromise() noexcept {
+    TaskPromise() noexcept 
+        : m_as_waiter_impl(new WrappedTaskWaiter<ReturnType>())
+    {
         LOG_TRACE("promise-" << m_id << " created");
-
-        m_controller =
-            std::make_shared<CoroutineController<ReturnType>>(std::coroutine_handle<TaskPromise>::from_promise(*this));
     }
     virtual ~TaskPromise() { LOG_TRACE("promise-" << m_id << " destroyed"); }
 
@@ -193,7 +180,6 @@ public:
     // NOLINTNEXTLINE
     auto final_suspend() noexcept {
         LOG_TRACE("promise-" << m_id << " final_suspend");
-        m_controller->OnCoroutineDone();
         return std::suspend_never{};
     }
 
@@ -203,29 +189,29 @@ public:
     // NOLINTNEXTLINE
     void return_value(const ReturnType& _value) noexcept {
         LOG_TRACE("promise-" << m_id << " return value&");
-        m_controller->SaveResult(_value);
-        m_controller->OnCoroutineReturn();
+        m_as_waiter_impl->SaveResult(_value);
+        m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
 
     // NOLINTNEXTLINE
     void return_value(ReturnType&& _value) noexcept {
         LOG_TRACE("promise-" << m_id << " return value&&");
-        m_controller->SaveResult(_value);
-        m_controller->OnCoroutineReturn();
+        m_as_waiter_impl->SaveResult(_value);
+        m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
 
     // NOLINTNEXTLINE
     void unhandled_exception() noexcept {
         LOG_TRACE("promise-" << m_id << " unhandled exception");
-        m_controller->SaveException(std::current_exception());
-        m_controller->OnCoroutineReturn();
+        m_as_waiter_impl->SaveException(std::current_exception());
+        m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
 
 private:
-    CorotineControllerSharedPtr m_controller;
+    WaiterImplPtr m_as_waiter_impl;
     ID<TaskPromise<Empty>> m_id;
 };
 
@@ -236,13 +222,12 @@ template <>
 class TaskPromise<void> {
 public:
     friend class Task<void>;
-    using CorotineControllerSharedPtr = std::shared_ptr<CoroutineController<void>>;
+    using WaiterImplPtr = std::shared_ptr<WrappedTaskWaiter<void>>;
 
-    TaskPromise() noexcept {
+    TaskPromise() noexcept 
+        : m_as_waiter_impl(new WrappedTaskWaiter<void>())
+    {
         LOG_TRACE("promise-" << m_id << " created");
-
-        m_controller =
-            std::make_shared<CoroutineController<void>>(std::coroutine_handle<TaskPromise>::from_promise(*this));
     }
     virtual ~TaskPromise() { LOG_TRACE("promise-" << m_id << " destroyed"); }
 
@@ -255,7 +240,6 @@ public:
     // NOLINTNEXTLINE
     auto final_suspend() noexcept {
         LOG_TRACE("promise-" << m_id << " final_suspend");
-        m_controller->OnCoroutineDone();
         return std::suspend_never{};
     }
 
@@ -265,33 +249,37 @@ public:
     // NOLINTNEXTLINE
     void return_void() noexcept {
         LOG_TRACE("promise-" << m_id << " return void");
-        m_controller->OnCoroutineReturn();
+        m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
 
     // NOLINTNEXTLINE
     void unhandled_exception() noexcept {
         LOG_TRACE("promise-" << m_id << " unhandled exception");
-        m_controller->SaveException(std::current_exception());
-        m_controller->OnCoroutineReturn();
+        m_as_waiter_impl->SaveException(std::current_exception());
+        m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
 
 private:
-    CorotineControllerSharedPtr m_controller;
+    WaiterImplPtr m_as_waiter_impl;
     ID<TaskPromise<Empty>> m_id;
 };
 
+
 template <typename ReturnType = void>
-class Task : public BaseTask<ReturnType>, IWaiter {
+class Task : public BaseTask<ReturnType>, public GeneralWaiter< WrappedTaskWaiter<ReturnType> >{
 public:
     using promise_type = TaskPromise<ReturnType>;  // NOLINT
-    using CorotineControllerSharedPtr = std::shared_ptr<CoroutineController<ReturnType>>;
+    using WaiterImplPtr = std::shared_ptr<WrappedTaskWaiter<ReturnType>>;
     using ParentTask = BaseTask<ReturnType>;
+    using ParentWaiter = GeneralWaiter< WrappedTaskWaiter<ReturnType> >;
 
-    Task(CorotineControllerSharedPtr& _controller) 
-        : ParentTask(_controller)
+    Task(WaiterImplPtr& _as_waiter_impl, std::coroutine_handle<promise_type> _handle) 
+        : ParentTask(_as_waiter_impl, _handle)
+        , ParentWaiter(_as_waiter_impl, std::source_location::current())
     {
+        _as_waiter_impl->SetWaiter(this);
         LOG_TRACE("task-" << ParentTask::m_id << " created");
     }
     virtual ~Task() { LOG_TRACE("task-" << ParentTask::m_id << " destroyed"); }
@@ -302,90 +290,22 @@ public:
         return *this;
     }
 
-    // NOLINTNEXTLINE
-    bool await_ready() const noexcept { return ParentTask::IsDone(); }
-    // NOLINTNEXTLINE
-    void await_suspend(std::coroutine_handle<> _awaiting_coroutine) noexcept {
-        m_parent_coroutine_controller = _awaiting_coroutine;
-        auto worker = Worker::GetCurrentWorker();
-        m_suspended_task = worker->GetCurrentRunningTask();
-        ParentTask::WaitReturn(Worker::GetCurrentWorker());
-        Worker::GetCurrentWorker()->OnTaskSuspend(this);
-    }
-    virtual void OnCoroutineReturn() override {
-        ParentTask::OnCoroutineReturn();
-
-		Worker::GetCurrentWorker()->OnTaskRun(m_suspended_task); 
-        m_suspended_task = nullptr;
-        m_parent_coroutine_controller.resume();
-    }
-
-    template <typename CheckType = ReturnType>  // NOLINTNEXTLINE
-    typename std::enable_if_t<std::is_void_v<CheckType>, void> await_resume() const {
-        LOG_TRACE("task-" << ParentTask::m_id << " return void");
-        ParentTask::m_controller->CheckException();
-    }
-
-    template <typename CheckType = ReturnType>  // NOLINTNEXTLINE
-    typename std::enable_if_t<!std::is_void_v<CheckType>, const CheckType>& await_resume() const {
-        LOG_TRACE("task-" << ParentTask::m_id << " return value&");
-        ParentTask::m_controller->CheckException();
-        return ParentTask::m_controller->GetResult();
-    }
-
     // wait for the task to complete in main thread
     void WaitInMain() {
         while (!ParentTask::IsDone()) { Worker::GetCurrentWorker()->Step(); }
     }
 
 private:
-    std::coroutine_handle<> m_parent_coroutine_controller;
-    ITask* m_suspended_task;
 };
-
-template <typename ReturnType>
-void CoroutineController<ReturnType>::AddWaitingTask(BaseTask<ReturnType>* _task, Worker* _worker) {
-    if (IsDone()) {
-        _worker->AddJob(new nd::Job{[_task]() { _task->OnCoroutineReturn(); }});
-        return;
-    }
-    std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
-    if (m_coroutine == nullptr) {
-        _worker->AddJob(new nd::Job{[_task]() { _task->OnCoroutineReturn(); }});
-        return;
-    }
-    m_waiting_tasks.emplace_back(_task, _worker);
-}
-
-template <typename ReturnType>
-void CoroutineController<ReturnType>::OnCoroutineReturn() {
-    // task is waited in other coroutine, so it ought to be exist
-    std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
-    for (auto& waiting_task : m_waiting_tasks) {
-        auto* task = std::get<0>(waiting_task);
-        auto* worker = std::get<1>(waiting_task);
-        worker->AddJob(new nd::Job{[task]() { task->OnCoroutineReturn(); }});
-    }
-    m_waiting_tasks.clear();
-}
-
-template <typename ReturnType>
-void CoroutineController<ReturnType>::OnCoroutineDone() {
-    std::lock_guard<std::mutex> lock(m_waiting_tasks_mutex);
-    if (m_coroutine) {
-        // m_coroutine.destroy();
-        m_coroutine = nullptr;
-    }
-}
 
 template <typename ReturnType>
 Task<ReturnType> TaskPromise<ReturnType>::get_return_object() noexcept {
     LOG_TRACE("promise-" << m_id << " get_return_object");
-    return Task<ReturnType>{m_controller};
+    return Task<ReturnType>(m_as_waiter_impl, std::coroutine_handle<TaskPromise>::from_promise(*this));
 }
 
 inline Task<void> TaskPromise<void>::get_return_object() noexcept {
     LOG_TRACE("promise-" << m_id << " get_return_object");
-    return Task<void>{m_controller};
+    return Task<void>(m_as_waiter_impl, std::coroutine_handle<TaskPromise>::from_promise(*this));
 }
 }  // namespace nd

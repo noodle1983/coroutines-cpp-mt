@@ -8,6 +8,7 @@
 #include <source_location>
 #include <type_traits>
 #include <map>
+#include <memory>
 
 namespace nd {
 
@@ -17,37 +18,42 @@ class TaskInnerWaiter;
 template<typename ImplType>
 class GeneralWaiter;
 
-class ImplTypeExample
+class WrappedWaiterImplTypeExample
 {
 public:
-	using WaiterType = TaskInnerWaiter<ImplTypeExample>;
+	using WaiterType = TaskInnerWaiter<WrappedWaiterImplTypeExample>;
 	// or using WaiterType = GeneralWaiter<ImplTypeExample>;
 	using RetType = void; // return type of await_resume
+    //WrappedWaiterImplTypeExample(WaiterType* _waiter, ...) : m_waiter(_waiter){ } 
+	//virtual ~WrappedWaiterImplTypeExample(){}
 
-	bool AwaitReady(); // return true to skip suspension
+	bool AwaitReady();   // as IsDone, return true to skip suspension
 	void AwaitSuspend(); // do something before suspension
-	// call Resume() to resume the suspended coroutine
+	// call m_waiter->Resume() to resume the suspended coroutine
 	RetType GetRetObj(); // return the object for await in the suspended coroutine/thread
+private:
+	WaiterType* m_waiter;
 };
 
 
 template<typename Impl, typename... Args>
-struct is_constructible_with_waiter : std::is_constructible<Impl, TaskInnerWaiter<Impl>*, Args...> {};
+struct is_constructible_with_task_inner_waiter : std::is_constructible<Impl, TaskInnerWaiter<Impl>*, Args...> {};
 
-// TaskInnerWaiter records only one coroutine handle, so it can be used in only one coroutine at a time.
+// TaskInnerWaiter records only one coroutine handle, 
+// so it can be used in only one coroutine at a time and thus no mutex.
 template<typename ImplType>
 class TaskInnerWaiter : public IWaiter {
 public:
     template <typename T = ImplType, 
         typename = std::enable_if_t<
-                 is_constructible_with_waiter<ImplType>::value>>
+                 is_constructible_with_task_inner_waiter<ImplType>::value>>
     TaskInnerWaiter(const std::source_location& _loc) 
         : m_task(nullptr), m_impl(this), m_src_id(_loc), m_resume_key(0)
     {}
 
     template<typename Arg0,
              typename = std::enable_if_t<
-                 is_constructible_with_waiter<ImplType, Arg0>::value>>
+                 is_constructible_with_task_inner_waiter<ImplType, Arg0>::value>>
     TaskInnerWaiter(Arg0 _arg0, const std::source_location& _loc = std::source_location::current()) 
         : m_impl(this, _arg0), 
           m_src_id(_loc), 
@@ -56,7 +62,7 @@ public:
 
     template<typename... Args,
              typename = std::enable_if_t<
-                 is_constructible_with_waiter<ImplType, Args...>::value>>
+                 is_constructible_with_task_inner_waiter<ImplType, Args...>::value>>
     TaskInnerWaiter(Args&&... _args, 
                    const std::source_location& _loc = std::source_location::current()) 
         : m_impl(this, std::forward<Args>(_args)...), 
@@ -106,30 +112,39 @@ private:
 };
 
 template<typename ImplType>
+class GeneralWaiter;
+template<typename Impl, typename... Args>
+struct is_constructible_with_general_waiter : std::is_constructible<Impl, GeneralWaiter<Impl>*, Args...> {};
+
+template<typename ImplType>
 class GeneralWaiter : public IWaiter {
 public:
+    GeneralWaiter(std::shared_ptr<ImplType>& _impl, const std::source_location& _loc) 
+        : m_impl(_impl), m_src_id(_loc)
+    {}
+
     template <typename T = ImplType, 
         typename = std::enable_if_t<
-                 is_constructible_with_waiter<ImplType>::value>>
+                 is_constructible_with_general_waiter<ImplType>::value>>
     GeneralWaiter(const std::source_location& _loc) 
-        : m_impl(std::make_shared(new ImplType(this)))
+        : m_impl(std::make_shared<ImplType>(this))
         , m_src_id(_loc)
     {}
 
     template<typename Arg0,
              typename = std::enable_if_t<
-                 is_constructible_with_waiter<ImplType, Arg0>::value>>
+                 is_constructible_with_general_waiter<ImplType, Arg0>::value>>
     GeneralWaiter(Arg0 _arg0, const std::source_location& _loc = std::source_location::current()) 
-        : m_impl(std::make_shared(new ImplType(this, _arg0)))
+        : m_impl(std::make_shared<ImplType>(this, _arg0))
         , m_src_id(_loc)
     {}
 
     template<typename... Args,
              typename = std::enable_if_t<
-                 is_constructible_with_waiter<ImplType, Args...>::value>>
+                 is_constructible_with_general_waiter<ImplType, Args...>::value>>
     GeneralWaiter(Args&&... _args, 
                    const std::source_location& _loc = std::source_location::current()) 
-        : m_impl(std::make_shared(this, std::forward<Args>(_args)...))
+        : m_impl(std::make_shared<ImplType>(this, std::forward<Args>(_args)...))
         , m_src_id(_loc)
     {}
     virtual ~GeneralWaiter(){}
@@ -146,29 +161,49 @@ public:
 
         MY_ASSERT(task != nullptr, "must await in a task!");
 
-        auto it = m_tasks_info.find(task);
+        {
+            std::lock_guard<std::mutex> lock(m_tasks_mutex);
+            auto it = m_tasks_info.find(task);
 
-        MY_ASSERT(it == m_tasks_info.end(), "task is already been suspended!");
-        m_tasks_info[task] = task->GetResumeKey(this);
+            MY_ASSERT(it == m_tasks_info.end(), "task is already been suspended!");
+            m_tasks_info[task] = task->GetResumeKey(this);
+        }
 
-        m_impl.AwaitSuspend();
+        m_impl->AwaitSuspend();
         worker->OnTaskSuspend(this);
+
+        // incase it is done in another thread
+        if (m_impl->AwaitReady()) { Resume(); }
     }
 
+    // can't catch exception in this version
     // NOLINTNEXTLINE
-    ImplType::RetType await_resume() const noexcept {
-        if constexpr (std::is_void_v<ImplType::RetType>) {
+    //ImplType::RetType await_resume() const noexcept {
+    //    if constexpr (std::is_void_v<ImplType::RetType>) {
+	//		m_impl->CheckException();
+    //    } else {
+	//		m_impl->CheckException();
+	//		return m_impl->GetRetObj();
+    //    }
+    //}
+	template <typename CheckType = ImplType::RetType>  // NOLINTNEXTLINE
+    typename std::enable_if_t<std::is_void_v<CheckType>, void> await_resume() const {
+        m_impl->CheckException();
+    }
 
-        } else {
-			return m_impl->GetRetObj();
-        }
+	template <typename CheckType = ImplType::RetType>  // NOLINTNEXTLINE
+    typename std::enable_if_t<!std::is_void_v<CheckType>, const CheckType>& await_resume() const {
+        m_impl->CheckException();
+        return m_impl->GetRetObj();
     }
 
     void Resume() { 
-        MY_ASSERT(!m_tasks_info.empty(), "not await yet!");
+		std::lock_guard<std::mutex> lock(m_tasks_mutex);
+        if (m_tasks_info.empty()) { return; } // if no task is awaiting
+
         for (auto it = m_tasks_info.begin(); it != m_tasks_info.end(); it++){
-            auto task = it->key();
-            auto resume_key = it->value();
+            auto task = it->first;
+            auto resume_key = it->second;
             task->Resume(this, resume_key);
         }
         m_tasks_info.clear();
@@ -176,6 +211,7 @@ public:
 
 private:
     std::map<ITask*, uint32_t> m_tasks_info;
+    std::mutex m_tasks_mutex;
     std::shared_ptr<ImplType> m_impl;
 
     nd::SrcId m_src_id;
