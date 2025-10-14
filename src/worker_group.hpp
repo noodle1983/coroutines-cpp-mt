@@ -42,6 +42,8 @@ public:
     void AddJob(const SessionId _id, Job* _job) { GetWorker(_id)->AddJob(_job); }
 
 private:
+    friend class WorkerManager;
+    friend class WorkerManagerTask;
     unsigned m_group_id;
     unsigned m_thread_count;
     Worker* m_workers;

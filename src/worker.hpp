@@ -52,7 +52,7 @@ public:
         MY_ASSERT(s_current_worker_group_id == PreDefWorkerGroup::Invalid, "main thread can not be marked twice.");
 
         s_current_thread_id = std::this_thread::get_id();
-        s_current_worker_group_id = PreDefWorkerGroup::Main;
+        s_current_worker_group_id = PreDefWorkerGroup::MainWorker;
         s_current_worker_id = 0;
         s_current_worker = GetMainWorker();
         snprintf(s_current_worker->m_worker_name, sizeof(s_current_worker->m_worker_name) - 1, "[main]");
@@ -92,6 +92,7 @@ public:
     void OnTaskSuspend(IWaiter* _waiter);
     void OnTaskEnd();
     ITask* GetCurrentRunningTask() { return m_current_running_task; }
+    void DumpTasks(std::ostream& os);
 
     friend std::ostream& operator<<(std::ostream& os, const Worker& obj) {
         os << obj.m_worker_name;

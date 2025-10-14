@@ -14,8 +14,8 @@ using JobQueue = std::list<Job*>;
 
 namespace PreDefWorkerGroup {  // NOLINT
 enum {
-    Main = -1,
-    Current = -2,
+    MainWorker = -1,
+    CurrentWorker = -2,
     Invalid = -3,
 };
 }

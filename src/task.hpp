@@ -1,3 +1,6 @@
+#ifndef TASK_H
+#define TASK_H
+
 #include "log.hpp"
 #include "worker_manager.hpp"
 #include "worker_types.hpp"
@@ -34,7 +37,7 @@ template <typename ReturnType>
 class WrappedTaskWaiter
 {
 public:
-	using WaiterType = GeneralWaiter<WrappedTaskWaiter<ReturnType>>;
+	using WaiterType = Task<ReturnType>;
 	using RetType = ReturnType; // return type of await_resume
     WrappedTaskWaiter() : m_waiter(nullptr), m_is_done(false){ 
         LOG_TRACE(*this << " created.");
@@ -43,7 +46,10 @@ public:
     WrappedTaskWaiter(WrappedTaskWaiter&) = delete;
 	virtual ~WrappedTaskWaiter(){}
 
-	bool AwaitReady() { return m_is_done; }
+	bool AwaitReady() { 
+        MY_ASSERT(m_waiter->IsStarted(), "task must be started before awaited");
+        return m_is_done;
+    }
 	void AwaitSuspend(){}
 	void ResumeUpperTask() { m_waiter->Resume(); }
 	void SetDone() {
@@ -85,7 +91,7 @@ public:
     ID<WrappedTaskWaiter<Empty>> m_id;
 };
 
-template <typename ReturnType = void>
+template <typename ReturnType>
 class BaseTask : public ITask {
 public:
     using promise_type = TaskPromise<ReturnType>;  // NOLINT
@@ -100,21 +106,7 @@ public:
     { LOG_TRACE(*this << " created"); }
     virtual ~BaseTask() {}
 
-    /****
-     * The task is started in a new job which is a new running context.
-     * So it has no impact on the current running task.
-     */
-    void BaseRunOnProcessor(int _worker_group_id = PreDefWorkerGroup::Current, const SessionId _the_id = 0) {
-        if (m_worker != nullptr) {
-            // LOG_WARN("task can't run twice");
-            return;
-        }
-
-        m_worker = g_worker_mgr->GetWorker(_worker_group_id, _the_id);
-        BaseResume(true);
-    }
-
-    virtual void Resume(IWaiter* waiter, uint32_t resume_key) override { 
+    virtual void AuthAndResume(IWaiter* waiter, uint32_t resume_key) override { 
         MY_ASSERT (waiter == m_waiter && resume_key == m_resume_key,
             "resume task from wrong waiter. suspended from [%p:%d], resumed from [%p:%d]", 
             m_waiter, m_resume_key, waiter, resume_key);
@@ -129,9 +121,25 @@ public:
         return m_resume_key;
     }
 
+    virtual IWaiter* GetWaiter() override { return m_waiter; }
+
+    bool IsStarted() const { return m_worker != nullptr; }
     bool IsDone() const { return m_as_waiter_impl->IsDone(); }
 
 protected:
+    /****
+     * The task is started in a new job which is a new running context.
+     * So it has no impact on the current running task.
+     */
+    void BaseRunOnProcessor(int _worker_group_id = PreDefWorkerGroup::CurrentWorker, const SessionId _the_id = 0) {
+        if (m_worker != nullptr) {
+            // LOG_WARN("task can't run twice");
+            return;
+        }
+
+        m_worker = g_worker_mgr->GetWorker(_worker_group_id, _the_id);
+        BaseResume(true);
+    }
 
     void BaseResume(bool _first_time){
         if (m_worker == nullptr) { return; }
@@ -288,8 +296,9 @@ public:
         _as_waiter_impl->SetWaiter(this);
     }
     virtual ~Task() { LOG_TRACE("task-" << ParentTask::m_id << " destroyed"); }
+    virtual std::ostream& GetWaiterDesc(std::ostream& os) const override{ return os << (ParentTask&)*this; }
 
-    Task& RunOnProcessor(int _worker_group_id = PreDefWorkerGroup::Current, const SessionId _the_id = 0, const char* _stat_name = nullptr, const std::source_location& _loc = std::source_location::current()) {
+    Task& RunOnProcessor(int _worker_group_id = PreDefWorkerGroup::CurrentWorker, const SessionId _the_id = 0, const char* _stat_name = nullptr, const std::source_location& _loc = std::source_location::current()) {
         ITask::SetStatInfo(_stat_name, _loc);
         ParentTask::BaseRunOnProcessor(_worker_group_id, _the_id);
         return *this;
@@ -314,3 +323,5 @@ inline Task<void> TaskPromise<void>::get_return_object() noexcept {
     return Task<void>(m_as_waiter_impl, std::coroutine_handle<TaskPromise>::from_promise(*this));
 }
 }  // namespace nd
+
+#endif /* TASK_H */

@@ -223,3 +223,19 @@ void Worker::OnTaskEnd() {
 
 //-----------------------------------------------------------------------------
 
+void Worker::DumpTasks(std::ostream& os) { 
+	os << "--------------------------------------------" << std::endl;
+    for (const auto& [id, task] : m_tasks) { 
+        os << *this << *task << " waiting at ";
+        auto waiter = task->GetWaiter();
+        if (waiter != nullptr) { 
+            waiter->GetWaiterDesc(os) << std::endl; 
+        } else {
+            os << "none" << std::endl;
+        }
+    }
+	os << "--------------------------------------------" << std::endl;
+
+}
+
+//-----------------------------------------------------------------------------

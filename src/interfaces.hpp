@@ -47,7 +47,8 @@ public:
         }
     }
 
-    virtual void Resume(IWaiter* waiter, uint32_t resume_key) = 0;
+    virtual IWaiter* GetWaiter() = 0; 
+    virtual void AuthAndResume(IWaiter* waiter, uint32_t resume_key) = 0;
     virtual uint32_t GetResumeKey(IWaiter* waiter) = 0;
 
     friend std::ostream& operator<<(std::ostream& os, const ITask& obj) {
@@ -68,6 +69,8 @@ class IWaiter {
 public:
     IWaiter() {}
     virtual ~IWaiter() {}
+
+    virtual std::ostream& GetWaiterDesc(std::ostream& os) const { return os << "no-def"; }
 
 protected:
 };

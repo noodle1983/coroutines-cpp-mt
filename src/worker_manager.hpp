@@ -9,16 +9,18 @@
 #include "worker_group.hpp"
 
 namespace nd {
+
 class WorkerManager {
-    enum { MaxWorkerGroup = 10 };
 
 public:
+    friend class WorkerManagerTask;
     WorkerManager() : m_max_worker_group(0), m_worker_groups(nullptr) {}
 
     ~WorkerManager() { StopAll(); }
 
+    size_t GetMaxWorkerGroup() const { return m_max_worker_group; }
+
     void Init(unsigned _max_worker_group) {
-        MY_ASSERT(_max_worker_group <= MaxWorkerGroup, "invalid max_worker_group:%d > MaxWorkerGroup.", _max_worker_group);
         m_max_worker_group = _max_worker_group;
 
         m_worker_groups = new WorkerGroup*[m_max_worker_group];
@@ -26,7 +28,6 @@ public:
     }
 
     void Start(unsigned _worker_group_id, signed _processor_num, const std::string& _the_name = "xxx") {
-        MY_ASSERT(_worker_group_id < m_max_worker_group, "invalid group id:%d >= MaxWorkerGroup", _worker_group_id);
         MY_ASSERT(m_worker_groups[_worker_group_id] == nullptr, "worker group is started twice");
 
         m_worker_groups[_worker_group_id] = new WorkerGroup(_worker_group_id, _processor_num, _the_name);
@@ -34,7 +35,6 @@ public:
     }
 
     void Stop(unsigned _worker_group_id) {
-        MY_ASSERT(_worker_group_id < m_max_worker_group, "invalid group id:%d >= MaxWorkerGroup", _worker_group_id);
         if (m_worker_groups[_worker_group_id] == nullptr) { return; }
 
         m_worker_groups[_worker_group_id]->WaitStop();
@@ -56,8 +56,8 @@ public:
     }
 
     Worker* GetWorker(unsigned _worker_group_id, size_t _session_id) {
-        if (_worker_group_id == PreDefWorkerGroup::Main) { return Worker::GetMainWorker(); }
-        if (_worker_group_id == PreDefWorkerGroup::Current) { return Worker::GetCurrentWorker(); }
+        if (_worker_group_id == PreDefWorkerGroup::MainWorker) { return Worker::GetMainWorker(); }
+        if (_worker_group_id == PreDefWorkerGroup::CurrentWorker) { return Worker::GetCurrentWorker(); }
 
         MY_ASSERT(0 <= _worker_group_id && _worker_group_id < m_max_worker_group, "invalid worker group:%d", _worker_group_id);
         MY_ASSERT(m_worker_groups[_worker_group_id] != nullptr, "worker group is not exist!");
@@ -66,8 +66,8 @@ public:
     }
 
     void RunOnWorkerGroup(int _worker_group_id, size_t _session_id, Job* _job) {
-        if (_worker_group_id == PreDefWorkerGroup::Main) { return RunOnMainThread(_job); }
-        if (_worker_group_id == PreDefWorkerGroup::Current) { return RunOnCurrentThread(_job); }
+        if (_worker_group_id == PreDefWorkerGroup::MainWorker) { return RunOnMainThread(_job); }
+        if (_worker_group_id == PreDefWorkerGroup::CurrentWorker) { return RunOnCurrentThread(_job); }
 
         MY_ASSERT(0 <= _worker_group_id && _worker_group_id < m_max_worker_group, "invalid worker group id:%d", _worker_group_id);
         MY_ASSERT(m_worker_groups[_worker_group_id] != nullptr, "target worker group:%d is not exist", _worker_group_id);
@@ -77,6 +77,9 @@ public:
     static void RunOnMainThread(Job* _job) { Worker::GetMainWorker()->AddJob(_job); }
 
     static void RunOnCurrentThread(Job* _job) { Worker::GetCurrentWorker()->AddJob(_job); }
+
+    static void RunOnAllThreads(Job* _job, int _except_group_id = PreDefWorkerGroup::Invalid);
+    static void RunOnGroupWorkers(int _group_id, Job* _job, int _except_group_id = PreDefWorkerGroup::Invalid);
 
 protected:
     size_t m_max_worker_group;

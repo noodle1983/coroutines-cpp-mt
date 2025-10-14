@@ -99,11 +99,16 @@ public:
 
     void Resume() { 
         MY_ASSERT(m_task != nullptr, "not await yet!");
-        m_task->Resume(this, m_resume_key);
+        m_task->AuthAndResume(this, m_resume_key);
         m_resume_key = 0;
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const TaskInnerWaiter<ImplType>& obj) {
+    virtual std::ostream& GetWaiterDesc(std::ostream& os) const override { 
+        return os << *this; 
+    }
+
+    template<typename OStream>
+    friend OStream& operator<<(OStream& os, const TaskInnerWaiter<ImplType>& obj) {
         char buff[128] = {0};
         obj.m_src_id.Get(buff, sizeof(buff));
         os << "InnerWaiter[" << buff << ']';
@@ -211,12 +216,17 @@ public:
         for (auto it = m_tasks_info.begin(); it != m_tasks_info.end(); it++){
             auto task = it->first;
             auto resume_key = it->second;
-            task->Resume(this, resume_key);
+            task->AuthAndResume(this, resume_key);
         }
         m_tasks_info.clear();
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const TaskInnerWaiter<ImplType>& obj) {
+    virtual std::ostream& GetWaiterDesc(std::ostream& os) const override { 
+        return os << *this; 
+    }
+
+    template <typename OStream>
+    friend OStream& operator<<(OStream& os, const GeneralWaiter<ImplType>& obj) {
         char buff[128] = {0};
         obj.m_src_id.Get(buff, sizeof(buff));
         os << "GenWaiter[" << buff << ']';
