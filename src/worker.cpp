@@ -193,6 +193,7 @@ void Worker::OnTaskStart(ITask* _task) {
     m_tasks[task_id] = _task;
 
 	OnTaskRun(_task);
+    m_current_running_task->OnTaskStartInTaskWorker();
 }
 
 //-----------------------------------------------------------------------------
@@ -218,6 +219,7 @@ void Worker::OnTaskEnd() {
     MY_ASSERT(it != m_tasks.end(), "task-%lld is not running?!", m_current_running_task->Id());
 
     m_tasks.erase(it);
+    m_current_running_task->OnTaskEndInTaskWorker();
     m_current_running_task = nullptr; 
 }
 
@@ -226,13 +228,7 @@ void Worker::OnTaskEnd() {
 void Worker::DumpTasks(std::ostream& os) { 
 	os << "--------------------------------------------" << std::endl;
     for (const auto& [id, task] : m_tasks) { 
-        os << *this << *task << " waiting at ";
-        auto waiter = task->GetWaiter();
-        if (waiter != nullptr) { 
-            waiter->GetWaiterDesc(os) << std::endl; 
-        } else {
-            os << "none" << std::endl;
-        }
+        os << *this << task->GetStatus(os) << std::endl;
     }
 	os << "--------------------------------------------" << std::endl;
 

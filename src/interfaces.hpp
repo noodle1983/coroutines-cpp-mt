@@ -7,7 +7,9 @@
 namespace nd {
 
 class IWaiter;
-struct Empty {};
+struct Empty {
+    inline friend std::ostream& operator<<(std::ostream& os, const Empty& obj) { return os;}
+};
 template <bool exists, class T>
 using Maybe = std::conditional_t<exists, T, Empty>;
 
@@ -50,6 +52,7 @@ public:
     virtual IWaiter* GetWaiter() = 0; 
     virtual void AuthAndResume(IWaiter* waiter, uint32_t resume_key) = 0;
     virtual uint32_t GetResumeKey(IWaiter* waiter) = 0;
+    virtual Empty GetStatus(std::ostream& os) const = 0;
 
     friend std::ostream& operator<<(std::ostream& os, const ITask& obj) {
         char buff[128] = {0};
@@ -58,7 +61,12 @@ public:
 		return os;
 	}
 
+
 protected:
+    friend class Worker;
+    virtual void OnTaskStartInTaskWorker() = 0;
+    virtual void OnTaskEndInTaskWorker() = 0;
+
     ID<BaseTask<Empty>> m_id;
 
     nd::SrcId m_src_id;
@@ -70,7 +78,10 @@ public:
     IWaiter() {}
     virtual ~IWaiter() {}
 
-    virtual std::ostream& GetWaiterDesc(std::ostream& os) const { return os << "no-def"; }
+    virtual Empty GetWaiterDesc(std::ostream& os) const {
+        os << "no-def";
+        return Empty{};
+    }
 
 protected:
 };

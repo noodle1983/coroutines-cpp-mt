@@ -122,8 +122,9 @@ private:
     {                                                                                                  \
         if (level >= g_log_level) {                                                                    \
             const char* filename = __FILE_NAME__;                                                      \
+            auto& os = std::cout;                                                                      \
             std::lock_guard<std::mutex> lock(g_file_logger->Mutex());                                  \
-            FormatLogPrefix(std::cout, g_loglevel_str[level], filename, __LINE__) << msg << std::endl; \
+            FormatLogPrefix(os, g_loglevel_str[level], filename, __LINE__) << msg << std::endl;        \
         }                                                                                              \
     }
 
@@ -159,8 +160,8 @@ private:
 // log relate
 #define LOG_TRACE(msg) STD_LOG(((int)LogLevel::TRACE), false, msg)
 #define LOG_DEBUG(msg) STD_LOG(((int)LogLevel::DEBUG), false, msg)
-#define LOG_INFO (msg) STD_LOG(((int)LogLevel::INFO), false, msg)
-#define LOG_WARN (msg) STD_LOG(((int)LogLevel::WARN), false, msg)
+#define LOG_INFO(msg) STD_LOG(((int)LogLevel::INFO), false, msg)
+#define LOG_WARN(msg) STD_LOG(((int)LogLevel::WARN), false, msg)
 #define LOG_ERROR(msg) STD_LOG(((int)LogLevel::ERROR), true, msg)
 #define LOG_FATAL(msg) STD_LOG(((int)LogLevel::FATAL), true, msg)
 

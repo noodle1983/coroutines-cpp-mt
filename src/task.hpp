@@ -103,6 +103,8 @@ public:
         , m_worker(nullptr) 
         , m_waiter(nullptr)
         , m_resume_key((uint32_t)time(nullptr))
+        , m_life_circle_alarm_ms(0)
+        , m_life_circle_timer(nullptr)
     { LOG_TRACE(*this << " created"); }
     virtual ~BaseTask() {}
 
@@ -122,6 +124,24 @@ public:
     }
 
     virtual IWaiter* GetWaiter() override { return m_waiter; }
+    virtual Empty GetStatus(std::ostream& os) const override {
+        if (!IsStarted()) {
+			os << *this << " not start yet.";
+            return Empty{};
+        }
+        if (IsDone()) {
+			os << *this << " is Done.";
+            return Empty{};
+        }
+
+        os << *this << " waiting at ";
+        if (m_waiter != nullptr) { 
+            return m_waiter->GetWaiterDesc(os); 
+        } else {
+            os << "none";
+        }
+        return Empty{};
+    }
 
     bool IsStarted() const { return m_worker != nullptr; }
     bool IsDone() const { return m_as_waiter_impl->IsDone(); }
@@ -146,16 +166,51 @@ protected:
 
         m_worker->AddJob(new nd::Job{[this, _first_time]() {
             if (!m_as_waiter_impl) { return; }
+            Worker* current_worker = Worker::GetCurrentWorker();
             if (_first_time) { 
 				LOG_TRACE(*this << " run");
-                Worker::GetCurrentWorker()->OnTaskStart(this);
+                current_worker->OnTaskStart(this);
             } else {
 				LOG_TRACE(*this << " resume");
-                Worker::GetCurrentWorker()->OnTaskRun(this); 
+                current_worker->OnTaskRun(this); 
             }
             m_my_handle.resume();
         }});
     }
+
+    void SetLifeCircleAlarm(uint32_t _ms_time) {
+        MY_ASSERT(!IsStarted(), "can't set life circle alarm after task started");
+        m_life_circle_alarm_ms = _ms_time;
+    }
+
+
+    void StartLifeCircleTimer() {
+        if (m_life_circle_alarm_ms == 0) { return; }
+		MY_ASSERT(m_life_circle_timer == nullptr, "life circle timer must be null at the beginning");
+		Worker* current_worker = Worker::GetCurrentWorker();
+		m_life_circle_timer = current_worker->AddLocalTimer(m_life_circle_alarm_ms, [this]() { 
+            m_life_circle_timer = nullptr;
+			if (IsDone()) { return; }
+			LOG_WARN("task life circle alarm triggered: " << GetStatus(os)); 
+		});
+    }
+
+    void StopLifeCircleTimer() {
+        if (m_life_circle_timer == nullptr) { return; }
+		Worker* current_worker = Worker::GetCurrentWorker();
+		current_worker->CancelLocalTimer(m_life_circle_timer);
+		m_life_circle_timer = nullptr;
+    }
+
+
+    virtual void OnTaskStartInTaskWorker() { 
+        StartLifeCircleTimer();
+    }
+
+    virtual void OnTaskEndInTaskWorker() {
+        StopLifeCircleTimer();
+    }
+
 
 protected:
     std::coroutine_handle<promise_type> m_my_handle;
@@ -163,6 +218,8 @@ protected:
     nd::Worker* m_worker;
     IWaiter* m_waiter;
     uint32_t m_resume_key;
+    uint32_t m_life_circle_alarm_ms;
+    TimerHandle m_life_circle_timer;
 };
 
 //-----------------------------------------
@@ -196,22 +253,24 @@ public:
     void return_value(const ReturnType& _value) noexcept {
         LOG_TRACE(*this << " return value&");
         m_as_waiter_impl->SaveResult(_value);
-        m_as_waiter_impl->SetDone();
-		Worker::GetCurrentWorker()->OnTaskEnd(); 
+        OnTaskEnd();
     }
 
     // NOLINTNEXTLINE
     void return_value(ReturnType&& _value) noexcept {
         LOG_TRACE(*this << " return value&&");
         m_as_waiter_impl->SaveResult(_value);
-        m_as_waiter_impl->SetDone();
-		Worker::GetCurrentWorker()->OnTaskEnd(); 
+        OnTaskEnd();
     }
 
     // NOLINTNEXTLINE
     void unhandled_exception() noexcept {
         LOG_TRACE(*this << " unhandled exception");
         m_as_waiter_impl->SaveException(std::current_exception());
+        OnTaskEnd();
+    }
+
+    void OnTaskEnd() {
         m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
@@ -258,14 +317,17 @@ public:
     // NOLINTNEXTLINE
     void return_void() noexcept {
         LOG_TRACE(*this << " return void");
-        m_as_waiter_impl->SetDone();
-		Worker::GetCurrentWorker()->OnTaskEnd(); 
+        OnTaskEnd();
     }
 
     // NOLINTNEXTLINE
     void unhandled_exception() noexcept {
         LOG_TRACE(*this << " unhandled exception");
         m_as_waiter_impl->SaveException(std::current_exception());
+        OnTaskEnd();
+    }
+
+    void OnTaskEnd() { 
         m_as_waiter_impl->SetDone();
 		Worker::GetCurrentWorker()->OnTaskEnd(); 
     }
@@ -296,7 +358,15 @@ public:
         _as_waiter_impl->SetWaiter(this);
     }
     virtual ~Task() { LOG_TRACE("task-" << ParentTask::m_id << " destroyed"); }
-    virtual std::ostream& GetWaiterDesc(std::ostream& os) const override{ return os << (ParentTask&)*this; }
+    virtual Empty GetWaiterDesc(std::ostream& os) const override {
+        os << (ParentTask&)*this;
+        return Empty{};
+    }
+
+    Task& WithLifeCircleAlarm(uint32_t _ms_time) { 
+        ParentTask::SetLifeCircleAlarm(_ms_time);
+        return *this;
+    }
 
     Task& RunOnProcessor(int _worker_group_id = PreDefWorkerGroup::CurrentWorker, const SessionId _the_id = 0, const char* _stat_name = nullptr, const std::source_location& _loc = std::source_location::current()) {
         ITask::SetStatInfo(_stat_name, _loc);

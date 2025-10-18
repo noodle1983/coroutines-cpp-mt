@@ -103,8 +103,9 @@ public:
         m_resume_key = 0;
     }
 
-    virtual std::ostream& GetWaiterDesc(std::ostream& os) const override { 
-        return os << *this; 
+    virtual Empty GetWaiterDesc(std::ostream& os) const override { 
+        os << *this; 
+        return Empty{};
     }
 
     template<typename OStream>
@@ -221,8 +222,9 @@ public:
         m_tasks_info.clear();
     }
 
-    virtual std::ostream& GetWaiterDesc(std::ostream& os) const override { 
-        return os << *this; 
+    virtual Empty GetWaiterDesc(std::ostream& os) const override { 
+        os << *this; 
+        return Empty{};
     }
 
     template <typename OStream>
