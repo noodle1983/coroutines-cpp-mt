@@ -243,6 +243,7 @@ public:
     // NOLINTNEXTLINE
     auto final_suspend() noexcept {
         LOG_TRACE(*this << " final_suspend");
+        OnTaskEnd();
         return std::suspend_never{};
     }
 
@@ -253,14 +254,12 @@ public:
     void return_value(const ReturnType& _value) noexcept {
         LOG_TRACE(*this << " return value&");
         m_as_waiter_impl->SaveResult(_value);
-        OnTaskEnd();
     }
 
     // NOLINTNEXTLINE
     void return_value(ReturnType&& _value) noexcept {
         LOG_TRACE(*this << " return value&&");
         m_as_waiter_impl->SaveResult(_value);
-        OnTaskEnd();
     }
 
     // NOLINTNEXTLINE

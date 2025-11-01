@@ -60,11 +60,30 @@ public:
           m_resume_key(0) 
     {}
 
+    template<typename Arg0, typename Arg1,
+             typename = std::enable_if_t<
+                 is_constructible_with_task_inner_waiter<ImplType, Arg0, Arg1>::value>>
+    TaskInnerWaiter(Arg0 _arg0, Arg1 _arg1, const std::source_location& _loc = std::source_location::current()) 
+        : m_impl(this, _arg0, _arg1), 
+          m_src_id(_loc), 
+          m_resume_key(0) 
+    {}
+
+    template<typename Arg0, typename Arg1, typename Arg2,
+             typename = std::enable_if_t<
+                 is_constructible_with_task_inner_waiter<ImplType, Arg0, Arg1, Arg2>::value>>
+    TaskInnerWaiter(Arg0 _arg0, Arg1 _arg1, Arg2 _arg2, const std::source_location& _loc = std::source_location::current()) 
+        : m_impl(this, _arg0, _arg1, _arg2), 
+          m_src_id(_loc), 
+          m_resume_key(0) 
+    {}
+
     template<typename... Args,
              typename = std::enable_if_t<
                  is_constructible_with_task_inner_waiter<ImplType, Args...>::value>>
-    TaskInnerWaiter(Args&&... _args, 
-                   const std::source_location& _loc = std::source_location::current()) 
+    TaskInnerWaiter(
+	    const std::source_location& _loc,
+        Args&&... _args)
         : m_impl(this, std::forward<Args>(_args)...), 
           m_src_id(_loc), 
           m_resume_key(0) 
@@ -89,7 +108,7 @@ public:
     }
 
     // NOLINTNEXTLINE
-    ImplType::RetType await_resume() const noexcept {
+    ImplType::RetType await_resume() noexcept {
         if constexpr (std::is_void_v<ImplType::RetType>) {
 
         } else {

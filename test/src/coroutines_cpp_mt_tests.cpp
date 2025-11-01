@@ -7,6 +7,7 @@
 #include "waiter/time_waiter.hpp"
 #include "worker_manager.hpp"
 #include "worker_manager_task.h"
+#include "waiter/seq_genner.hpp"
 
 #if _MSC_VER
 #include <windows.h>
@@ -333,6 +334,29 @@ TEST_F(CoroutinesCppMtTest, TaskReturnTask) {
                 }();
             }();
             co_await bg_task.WithLifeCircleAlarm(1000).RunOnProcessor(WorkerGroup::BG1);
+        }
+        LOG_TRACE("<------------------------------------ coroutinue 1");
+
+        LOG_TRACE("<- main task in worker" << nd::Worker::GetCurrWorkerName());
+    }();
+
+    main_task.RunOnProcessor();  // run on current worker, which is main worker on
+                                 // the marked main thread.
+    main_task.WaitInMain();
+    nd::Worker::GetMainWorker()->WaitUntilEmpty();
+}
+
+TEST_F(CoroutinesCppMtTest, YieldValue) {
+    auto main_task = []() -> nd::Task<> {
+        LOG_TRACE("-> main task in worker" << nd::Worker::GetCurrWorkerName());
+
+        LOG_TRACE(">------------------------------------ coroutinue 1");
+        {
+			auto seq_gener = nd::SeqGennerWaiter(std::source_location::current());
+            for (int i = 0; i < 10; i++) {
+				EXPECT_EQ(i, co_await seq_gener);
+            }
+
         }
         LOG_TRACE("<------------------------------------ coroutinue 1");
 
