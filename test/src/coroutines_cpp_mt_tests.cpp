@@ -316,3 +316,31 @@ TEST_F(CoroutinesCppMtTest, Task_Life_Circle_Alarm) {
     main_task.WaitInMain();
     nd::Worker::GetMainWorker()->WaitUntilEmpty();
 }
+
+TEST_F(CoroutinesCppMtTest, TaskReturnTask) {
+    auto main_task = []() -> nd::Task<> {
+        LOG_TRACE("-> main task in worker" << nd::Worker::GetCurrWorkerName());
+
+        LOG_TRACE(">------------------------------------ coroutinue 1");
+        {
+            // bg_task start from here
+            auto bg_task = []() -> nd::Task<> {
+                return []() -> nd::Task<> {
+                    LOG_TRACE("-> bg task in worker" << nd::Worker::GetCurrWorkerName());
+                    co_await nd::TimeWaiter(2000);  // NOLINT
+                    LOG_TRACE("<- bg task in worker" << nd::Worker::GetCurrWorkerName() << " after 1 sec later");
+                    co_return;
+                }();
+            }();
+            co_await bg_task.WithLifeCircleAlarm(1000).RunOnProcessor(WorkerGroup::BG1);
+        }
+        LOG_TRACE("<------------------------------------ coroutinue 1");
+
+        LOG_TRACE("<- main task in worker" << nd::Worker::GetCurrWorkerName());
+    }();
+
+    main_task.RunOnProcessor();  // run on current worker, which is main worker on
+                                 // the marked main thread.
+    main_task.WaitInMain();
+    nd::Worker::GetMainWorker()->WaitUntilEmpty();
+}
