@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.2)
 
 project(coroutines-cpp-mt C CXX)
 
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+set(BUILD_SHARED_LIBS ON)
+
 file(GLOB_RECURSE coroutines_cpp_mt_SRC 
 	CONFIGURE_DEPENDS 
     "*.h"
@@ -30,7 +33,7 @@ endfunction(assign_files_group)
 
 assign_files_group(${coroutines_cpp_mt_SRC})
 
-add_library(coroutines_cpp_mt SHARED STATIC ${coroutines_cpp_mt_SRC})
+add_library(coroutines_cpp_mt ${coroutines_cpp_mt_SRC})
 #set_property(TARGET coroutines_cpp_mt PROPERTY
 #  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
